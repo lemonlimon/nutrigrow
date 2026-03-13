@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { calculateRisk } from '@/lib/riskCalculator'
+import RiskResultCard from './RiskResult'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,7 @@ interface FormState {
   weightUnit: WeightUnit
   heightValue: string
   heightUnit: HeightUnit
+  waistValue: string
   activity: ActivityLevel
   screenTime: ScreenTime
   fastFood: FastFood
@@ -123,6 +126,7 @@ export default function AssessmentForm() {
     weightUnit: 'kg',
     heightValue: '',
     heightUnit: 'cm',
+    waistValue: '',
     activity: null,
     screenTime: null,
     fastFood: null,
@@ -131,6 +135,7 @@ export default function AssessmentForm() {
   })
 
   const [loading, setLoading] = useState(false)
+  const [showResult, setShowResult] = useState(false)
 
   // ── Unit conversion helpers ──────────────────────────────────────────────
 
@@ -182,26 +187,53 @@ export default function AssessmentForm() {
   // ── Progress calculation ─────────────────────────────────────────────────
 
   const fields = [
-    form.country,
-    form.sex,
-    form.age,
-    form.weightValue,
-    form.heightValue,
-    form.activity,
-    form.screenTime,
-    form.fastFood,
-    form.familyHistory,
+    form.country, form.sex, form.age,
+    form.weightValue, form.heightValue,
+    form.activity, form.screenTime,
+    form.fastFood, form.familyHistory,
   ]
   const filled = fields.filter(Boolean).length
   const progress = Math.round((filled / fields.length) * 100)
+
+  // ── Live risk result ────────────────────────────────────────────────────
+
+  const riskResult = useMemo(() => {
+    const wRaw = parseFloat(form.weightValue)
+    const hRaw = parseFloat(form.heightValue)
+    if (isNaN(wRaw) || isNaN(hRaw)) return null
+    const wKg = form.weightUnit === 'lbs' ? wRaw / 2.20462 : wRaw
+    const hM  = form.heightUnit === 'in'  ? (hRaw * 2.54) / 100 : hRaw / 100
+    if (
+      !wKg || !hM || !form.sex || !form.age || !form.country ||
+      !form.activity || !form.screenTime || !form.fastFood || !form.familyHistory
+    ) return null
+    const bmiVal = wKg / (hM * hM)
+    const waistRaw = parseFloat(form.waistValue)
+    return calculateRisk({
+      bmi: bmiVal,
+      sex: form.sex,
+      age: form.age,
+      waistCm: !isNaN(waistRaw) ? waistRaw : undefined,
+      activity: form.activity,
+      screenTime: form.screenTime,
+      fastFood: form.fastFood,
+      familyHistory: form.familyHistory,
+      country: form.country,
+    })
+  }, [ // eslint-disable-line react-hooks/exhaustive-deps
+    form.weightValue, form.weightUnit, form.heightValue, form.heightUnit,
+    form.waistValue, form.sex, form.age, form.country,
+    form.activity, form.screenTime, form.fastFood, form.familyHistory,
+  ])
 
   // ── Submit ───────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setShowResult(true)
     // TODO: save to Supabase + call AI report generator
-    console.log('Assessment data:', form, 'BMI:', bmi)
+    console.log('Assessment data:', form, 'Risk:', riskResult)
     setLoading(false)
   }
 
@@ -316,6 +348,27 @@ export default function AssessmentForm() {
         </div>
       )}
 
+      {/* Waist Circumference (optional) */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel>Waist Circumference <span className="text-gray-300 font-normal normal-case tracking-normal">(optional)</span></SectionLabel>
+          <span className="text-xs text-gray-400">cm</span>
+        </div>
+        <input
+          type="number"
+          step="0.1"
+          min="40"
+          max="200"
+          placeholder="e.g. 94 cm — improves risk accuracy"
+          value={form.waistValue}
+          onChange={(e) => setForm((f) => ({ ...f, waistValue: e.target.value }))}
+          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          IDF 2006 thresholds: Men ≥94 cm, Women ≥80 cm indicates central adiposity <span className="text-amber-500">[VERIFY]</span>
+        </p>
+      </div>
+
       {/* Physical Activity */}
       <div>
         <SectionLabel>Physical Activity (days/week)</SectionLabel>
@@ -394,11 +447,19 @@ export default function AssessmentForm() {
         className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold text-base hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {loading
-          ? 'Generating AI Report...'
+          ? 'Calculating Risk...'
           : progress < 80
           ? `Complete assessment to continue (${progress}%)`
-          : 'Save & Generate AI Report →'}
+          : 'Calculate Risk & Generate Report →'}
       </button>
+
+      {/* Risk Result — shown after submit */}
+      {showResult && riskResult && (
+        <div className="border-t border-gray-200 pt-8">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Clinical Risk Summary</h3>
+          <RiskResultCard result={riskResult} />
+        </div>
+      )}
 
     </form>
   )

@@ -2,7 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { calculateRisk } from '@/lib/riskCalculator'
+import type { GenerateReportResponse } from '@/app/api/generate-report/route'
 import RiskResultCard from './RiskResult'
+
+// ─── Report tab type (module-level — not inside the component) ────────────────
+type ReportTab = 'physician-en' | 'physician-ar' | 'patient-en' | 'patient-ar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +15,7 @@ type ActivityLevel = '0' | '1' | '2' | '3' | '4' | '5+' | null
 type ScreenTime = '<1' | '1-2' | '2-3' | '3-4' | '>4' | null
 type FastFood = '0' | '1' | '2' | '3' | '4+' | null
 type FamilyHistory = 'none' | 'one' | 'both' | null
+type Comorbidity = 'hypertension' | 'type2_diabetes' | 'high_cholesterol'
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'in'
 type Country = 'SA' | 'AE' | null
@@ -28,6 +33,7 @@ interface FormState {
   screenTime: ScreenTime
   fastFood: FastFood
   familyHistory: FamilyHistory
+  comorbidities: Comorbidity[] | null   // null = unanswered; [] = none
   notes: string
 }
 
@@ -131,11 +137,17 @@ export default function AssessmentForm() {
     screenTime: null,
     fastFood: null,
     familyHistory: null,
+    comorbidities: null,
     notes: '',
   })
 
-  const [loading, setLoading] = useState(false)
   const [showResult, setShowResult] = useState(false)
+
+  // ── Report state ─────────────────────────────────────────────────────────
+  const [report, setReport] = useState<GenerateReportResponse | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<ReportTab>('physician-en')
 
   // ── Unit conversion helpers ──────────────────────────────────────────────
 
@@ -191,6 +203,7 @@ export default function AssessmentForm() {
     form.weightValue, form.heightValue,
     form.activity, form.screenTime,
     form.fastFood, form.familyHistory,
+    form.comorbidities,  // null = unanswered, [] or [...] = answered
   ]
   const filled = fields.filter(Boolean).length
   const progress = Math.round((filled / fields.length) * 100)
@@ -219,22 +232,55 @@ export default function AssessmentForm() {
       fastFood: form.fastFood,
       familyHistory: form.familyHistory,
       country: form.country,
+      comorbidities: (form.comorbidities ?? []) as ('hypertension' | 'type2_diabetes' | 'high_cholesterol')[],
     })
   }, [ // eslint-disable-line react-hooks/exhaustive-deps
     form.weightValue, form.weightUnit, form.heightValue, form.heightUnit,
     form.waistValue, form.sex, form.age, form.country,
     form.activity, form.screenTime, form.fastFood, form.familyHistory,
+    form.comorbidities,
   ])
 
   // ── Submit ───────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    if (!riskResult || !form.sex || !form.age || !form.country) return
+
+    // Risk result is already computed live via useMemo — show it immediately
     setShowResult(true)
-    // TODO: save to Supabase + call AI report generator
-    console.log('Assessment data:', form, 'Risk:', riskResult)
-    setLoading(false)
+    setReport(null)
+    setReportError(null)
+    setActiveTab('physician-en')
+
+    // ── Call AI report generator (separate loading state from form submit) ──
+    setReportLoading(true)
+    try {
+      const res = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          riskResult,
+          sex:           form.sex,
+          age:           form.age,
+          country:       form.country,
+          patientRef:    null,
+          clinicalNotes: form.notes?.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+      }
+      const data: GenerateReportResponse = await res.json()
+      setReport(data)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error('[AssessmentForm] report error:', message)
+      setReportError('Report generation failed. Please try again.')
+    } finally {
+      setReportLoading(false)
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -297,6 +343,7 @@ export default function AssessmentForm() {
             placeholder="Or type any age (12–120)"
             value={form.age ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, age: parseInt(e.target.value) || null }))}
+            onWheel={(e) => e.currentTarget.blur()}
             className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           <span className="text-sm text-gray-400 whitespace-nowrap">yrs</span>
@@ -319,6 +366,7 @@ export default function AssessmentForm() {
           placeholder={form.weightUnit === 'kg' ? 'e.g. 92.5' : 'e.g. 204.0'}
           value={form.weightValue}
           onChange={(e) => setForm((f) => ({ ...f, weightValue: e.target.value }))}
+          onWheel={(e) => e.currentTarget.blur()}
           className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
       </div>
@@ -336,6 +384,7 @@ export default function AssessmentForm() {
           placeholder={form.heightUnit === 'cm' ? 'e.g. 170' : 'e.g. 67.0'}
           value={form.heightValue}
           onChange={(e) => setForm((f) => ({ ...f, heightValue: e.target.value }))}
+          onWheel={(e) => e.currentTarget.blur()}
           className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
       </div>
@@ -362,6 +411,7 @@ export default function AssessmentForm() {
           placeholder="e.g. 94 cm — improves risk accuracy"
           value={form.waistValue}
           onChange={(e) => setForm((f) => ({ ...f, waistValue: e.target.value }))}
+          onWheel={(e) => e.currentTarget.blur()}
           className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
         <p className="text-xs text-gray-400 mt-1">
@@ -409,6 +459,64 @@ export default function AssessmentForm() {
         </div>
       </div>
 
+      {/* Weight-Related Comorbidities */}
+      <div>
+        <SectionLabel>Weight-Related Conditions</SectionLabel>
+        <p className="text-xs text-gray-400 mb-3">Select all that apply — or tap &quot;None&quot; if none are present</p>
+        <div className="flex flex-wrap gap-2">
+          {/* "None" clears all selections */}
+          <button
+            type="button"
+            onClick={() => setForm((f) => ({ ...f, comorbidities: [] }))}
+            className={`
+              px-4 py-3 rounded-xl font-semibold text-sm border-2 transition-all
+              ${form.comorbidities !== null && form.comorbidities.length === 0
+                ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-[1.03]'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-teal-400 hover:text-teal-700'
+              }
+            `}
+          >
+            None
+          </button>
+          {(
+            [
+              { value: 'hypertension',    label: 'Hypertension' },
+              { value: 'type2_diabetes',  label: 'Type 2 Diabetes' },
+              { value: 'high_cholesterol', label: 'High Cholesterol' },
+            ] as { value: Comorbidity; label: string }[]
+          ).map(({ value, label }) => {
+            const selected = form.comorbidities?.includes(value) ?? false
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() =>
+                  setForm((f) => {
+                    const current = f.comorbidities ?? []
+                    const updated = current.includes(value)
+                      ? current.filter((c) => c !== value)
+                      : [...current, value]
+                    return { ...f, comorbidities: updated }
+                  })
+                }
+                className={`
+                  px-4 py-3 rounded-xl font-semibold text-sm border-2 transition-all
+                  ${selected
+                    ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-[1.03]'
+                    : 'bg-white border-gray-200 text-gray-700 hover:border-teal-400 hover:text-teal-700'
+                  }
+                `}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        {form.comorbidities === null && (
+          <p className="text-xs text-amber-500 mt-2">Please indicate whether any conditions are present</p>
+        )}
+      </div>
+
       {/* Clinical Notes */}
       <div>
         <SectionLabel>Clinical Notes (optional)</SectionLabel>
@@ -443,21 +551,103 @@ export default function AssessmentForm() {
       {/* Submit */}
       <button
         type="submit"
-        disabled={loading || progress < 80}
+        disabled={progress < 80}
         className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold text-base hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading
-          ? 'Calculating Risk...'
-          : progress < 80
+        {progress < 80
           ? `Complete assessment to continue (${progress}%)`
           : 'Calculate Risk & Generate Report →'}
       </button>
 
       {/* Risk Result — shown after submit */}
       {showResult && riskResult && (
-        <div className="border-t border-gray-200 pt-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Clinical Risk Summary</h3>
-          <RiskResultCard result={riskResult} />
+        <div className="border-t border-gray-200 pt-8 space-y-8">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Clinical Risk Summary</h3>
+            <RiskResultCard result={riskResult} />
+          </div>
+
+          {/* AI Report Section */}
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">🗒 AI-Generated Reports</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              {reportLoading
+                ? 'Generating reports…'
+                : report
+                ? 'Select a report below to view or print.'
+                : reportError
+                ? reportError
+                : null}
+            </p>
+
+            {/* Loading spinner */}
+            {reportLoading && (
+              <div className="flex items-center justify-center py-10 text-teal-600">
+                <svg className="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                <span className="text-sm font-medium">Generating AI reports…</span>
+              </div>
+            )}
+
+            {/* Error state */}
+            {reportError && !reportLoading && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-red-700 text-sm">
+                {reportError}
+              </div>
+            )}
+
+            {/* Report tabs */}
+            {report && !reportLoading && (
+              <div className="space-y-4">
+                {/* Tab bar */}
+                <div className="flex gap-2 flex-wrap">
+                  {(
+                    [
+                      { key: 'physician-en', label: '⚕️ Physician (EN)' },
+                      { key: 'physician-ar', label: '⚕️ Physician (AR)' },
+                      { key: 'patient-en',   label: '🧑 Patient (EN)' },
+                      { key: 'patient-ar',   label: '🧑 Patient (AR)' },
+                    ] as { key: ReportTab; label: string }[]
+                  ).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveTab(key)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                        activeTab === key
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Report body */}
+                <div
+                  dir={activeTab.endsWith('-ar') ? 'rtl' : 'ltr'}
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-5 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-[inherit]"
+                >
+                  {activeTab === 'physician-en' && report.reportPhysicianEn}
+                  {activeTab === 'physician-ar' && report.reportPhysicianAr}
+                  {activeTab === 'patient-en'   && report.reportPatientEn}
+                  {activeTab === 'patient-ar'   && report.reportPatientAr}
+                </div>
+
+                {/* Print button */}
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="text-sm text-teal-600 hover:underline"
+                >
+                  🖨 Print this report
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

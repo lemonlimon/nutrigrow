@@ -78,14 +78,16 @@ export function classifyBMI(bmi: number): BMIClassification {
     bmi < 40   ? '35.0–39.9' : '≥40.0'
 
   // Gulf/Asian-adjusted [2]
+  // Corrected cutpoints per handoff clinical spec:
+  //   Normal: 18.5–22.9 | Overweight: 23.0–27.4
+  //   Obesity I: 27.5–32.4 | Obesity II: 32.5–37.4 | Obesity III: ≥37.5
   const gulfCategory =
     bmi < 18.5 ? 'Underweight' :
     bmi < 23   ? 'Normal weight' :
     bmi < 27.5 ? 'Overweight' :
-    bmi < 30   ? 'Obesity Class I' :
-    bmi < 35   ? 'Obesity Class II' :
-    bmi < 40   ? 'Obesity Class III' :
-                 'Obesity Class III (Severe)'
+    bmi < 32.5 ? 'Obesity Class I' :
+    bmi < 37.5 ? 'Obesity Class II' :
+                 'Obesity Class III'
 
   const gulfColor = bmi < 23 ? 'green' : bmi < 27.5 ? 'yellow' : 'red'
 
@@ -93,9 +95,8 @@ export function classifyBMI(bmi: number): BMIClassification {
     bmi < 18.5 ? '<18.5' :
     bmi < 23   ? '18.5–22.9' :
     bmi < 27.5 ? '23.0–27.4' :
-    bmi < 30   ? '27.5–29.9' :
-    bmi < 35   ? '30.0–34.9' :
-    bmi < 40   ? '35.0–39.9' : '≥40.0'
+    bmi < 32.5 ? '27.5–32.4' :
+    bmi < 37.5 ? '32.5–37.4' : '≥37.5'
 
   return {
     bmi,
@@ -131,18 +132,23 @@ export function calculateRisk(input: {
   fastFood: string
   familyHistory: string
   country: 'SA' | 'AE'
+  // Optional comorbidities — used for physician alert only, not scored
+  comorbidities?: ('hypertension' | 'type2_diabetes' | 'high_cholesterol')[]
 }): RiskResult {
-  const { bmi, sex, age, waistCm, activity, screenTime, fastFood, familyHistory, country } = input
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { bmi, sex, waistCm, activity, screenTime, fastFood, familyHistory, country: _country, comorbidities = [] } = input
   const factors: RiskFactor[] = []
   let score = 0
 
   // ── BMI (Gulf-adjusted for scoring) ────────────────────────────────────────
+  // Cutpoints aligned to corrected Gulf thresholds:
+  //   Overweight 23–27.4 → 2pts | Obesity I 27.5–32.4 → 3pts
+  //   Obesity II 32.5–37.4 → 5pts | Obesity III ≥37.5 → 6pts
   const bmiPts =
     bmi < 23   ? 0 :
     bmi < 27.5 ? 2 :
-    bmi < 30   ? 3 :
-    bmi < 35   ? 4 :
-    bmi < 40   ? 5 : 6
+    bmi < 32.5 ? 3 :
+    bmi < 37.5 ? 5 : 6
   score += bmiPts
   factors.push({
     label: 'BMI (Gulf-adjusted)',
@@ -258,14 +264,29 @@ export function calculateRisk(input: {
   if (recs.length === 0)
     recs.push('Maintain current healthy behaviours. Annual monitoring recommended.')
 
-  // ── KSA/UAE Physician Alerts ────────────────────────────────────────────────
+  // ── Physician Alert — Advanced Pharmacotherapy Consideration ────────────────
+  // Fires based on clinical criteria only (no country differentiation for now).
+  // Physician-facing only — never appears in patient-facing output.
+  // Never mentions brand names or makes a specific treatment recommendation.
+  const isObese = bmi >= 27.5                                           // Gulf Obesity I or above
+  const isOverweightWithComorbidity = bmi >= 23 && bmi < 27.5 && comorbidities.length > 0
+
   let physicianAlert: string | undefined
-  if (country === 'SA' && age < 18) {
+  if (isObese || isOverweightWithComorbidity) {
+    const bmiLabel = classifyBMI(bmi).gulf.category
+    const comorbidityList = comorbidities
+      .map(c =>
+        c === 'hypertension'     ? 'hypertension' :
+        c === 'type2_diabetes'   ? 'type 2 diabetes' : 'high cholesterol'
+      )
+      .join(', ')
+
     physicianAlert =
-      '⚕️ KSA ALERT: GLP-1 agents (semaglutide, liraglutide) are NOT SFDA-approved for pediatric obesity in KSA as of March 2026. Do NOT include in parent-facing reports.'
-  } else if (country === 'AE') {
-    physicianAlert =
-      '🇦🇪 UAE NOTE: Wegovy (semaglutide) and Saxenda (liraglutide) have differing MOHAP approval statuses. Flag any GLP-1 mention for your explicit clinical review before patient delivery.'
+      `⚕️ CLINICAL FLAG — ${bmiLabel}${comorbidityList ? ` with ${comorbidityList}` : ''}: ` +
+      `This patient may meet criteria to consider advanced pharmacotherapy options as part of a ` +
+      `comprehensive obesity management plan. Evaluate eligibility and confirm applicable ` +
+      `regulatory approval status before prescribing. This flag is for physician use only and ` +
+      `must not appear in patient-facing reports.`
   }
 
   return {

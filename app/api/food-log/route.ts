@@ -13,7 +13,9 @@ const GULF_DISHES = [
   'Madfoon', 'Jareesh', 'Saleeg',
 ]
 
-const SYSTEM_PROMPT = `You are a nutrition assistant for a Gulf-region health app. Analyze the food photo and respond with a JSON object only — no markdown, no extra text.
+// Step 4D — build prompt dynamically so food name hint can be injected
+function buildSystemPrompt(foodNameHint: string | null): string {
+  const base = `You are a nutrition assistant for a Gulf-region health app. Analyze the food photo and respond with a JSON object only — no markdown, no extra text.
 
 Common Gulf dishes to recognize: ${GULF_DISHES.join(', ')}, and other regional foods.
 If you are uncertain about any food identification, note it clearly rather than guessing.
@@ -44,6 +46,12 @@ Calorie rules:
 
 Tone: warm, direct, factual. No exclamation points.`
 
+  if (!foodNameHint) return base
+
+  return base + `\n\nThe patient has identified this food as: "${foodNameHint}". Cross-check this with the photo. If they match, use the patient's name as the dish name. If they clearly don't match, use what you see in the photo and note the discrepancy in note_en.`
+}
+
+// Step 4F — mock response includes meal_type as a fallback for testing
 const MOCK_RESPONSE = {
   dish_name:              'Kabsa',
   calories_estimate_low:  550,
@@ -54,6 +62,7 @@ const MOCK_RESPONSE = {
   tag:                    'yellow' as const,
   note_en:                'Good choice — consider a smaller rice portion and more salad on the side.',
   note_ar:                'خيار جيد — يُنصح بتقليل كمية الأرز وإضافة سلطة جانبية.',
+  meal_type:              'lunch' as string | null,
 }
 
 interface FoodAnalysis {
@@ -68,6 +77,18 @@ interface FoodAnalysis {
   note_ar:                string
 }
 
+// Step 4C — server-side sanitizer (defense in depth; client also sanitizes)
+function sanitizeFoodNameHint(raw: string): string | null {
+  const cleaned = raw
+    .replace(/<[^>]*>/g, '')                                    // strip HTML
+    .replace(/https?:\/\/\S+/gi, '')                            // strip URLs
+    .replace(/[^a-zA-Z0-9\s\-''\u0600-\u06FF]/g, '')           // keep allowed chars only
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100)
+  return cleaned.length > 0 ? cleaned : null
+}
+
 export async function POST(request: Request) {
   let formData: FormData
   try {
@@ -76,7 +97,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Invalid form data' }, { status: 400 })
   }
 
-  const imageFile = formData.get('image') as File | null
+  const imageFile = formData.get('image')     as File   | null
   const patientId = formData.get('patientId') as string | null
 
   if (!imageFile || !patientId) {
@@ -91,7 +112,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Invalid patientId' }, { status: 400 })
   }
 
+  // Step 4B — read optional fields from form data
+  const rawMealType     = formData.get('mealType')     as string | null
+  const rawFoodNameHint = formData.get('foodNameHint') as string | null
+
+  const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
+  const mealType     = rawMealType && VALID_MEAL_TYPES.includes(rawMealType) ? rawMealType : null
+  const foodNameHint = rawFoodNameHint ? sanitizeFoodNameHint(rawFoodNameHint) : null
+
+  // Step 4A — rate limiting: max 10 meal logs per patient per 24 hours
+  const admin          = createAdminClient()
+  const since24h       = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count: logCount } = await admin
+    .from('food_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('patient_id', patientId)
+    .gte('logged_at', since24h)
+
+  if ((logCount ?? 0) >= 10) {
+    return NextResponse.json(
+      { success: false, error: 'Daily limit reached. You can log up to 10 meals per day.' },
+      { status: 429 }
+    )
+  }
+
+  // ── AI analysis ───────────────────────────────────────────────────────────
   let analysis: FoodAnalysis
+
   if (process.env.USE_MOCK_AI === 'true') {
     analysis = MOCK_RESPONSE
   } else {
@@ -101,7 +148,8 @@ export async function POST(request: Request) {
       'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
     try {
-      const anthropic = new Anthropic()
+      const anthropic   = new Anthropic()
+      const systemPrompt = buildSystemPrompt(foodNameHint)   // Step 4D
       const message = await anthropic.messages.create({
         model:      MODEL,
         max_tokens: 512,
@@ -109,7 +157,7 @@ export async function POST(request: Request) {
           role:    'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text',  text: SYSTEM_PROMPT },
+            { type: 'text',  text: systemPrompt },
           ],
         }],
       })
@@ -130,7 +178,10 @@ export async function POST(request: Request) {
     analysis.tag = 'yellow'
   }
 
-  const admin = createAdminClient()
+  // Step 4E — insert includes meal_type
+  const effectiveMealType = mealType ??
+    (process.env.USE_MOCK_AI === 'true' ? MOCK_RESPONSE.meal_type : null)
+
   const { error: insertError } = await admin.from('food_logs').insert({
     patient_id:             patientId,
     dish_name:              analysis.dish_name,
@@ -139,6 +190,7 @@ export async function POST(request: Request) {
     tag:                    analysis.tag,
     note_en:                analysis.note_en,
     note_ar:                analysis.note_ar,
+    meal_type:              effectiveMealType,             // Step 4E
   })
 
   if (insertError) {
@@ -149,5 +201,8 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.json({ success: true, data: analysis })
+  return NextResponse.json({
+    success: true,
+    data:    { ...analysis, meal_type: effectiveMealType },
+  })
 }

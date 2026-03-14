@@ -34,6 +34,7 @@ interface FoodLog {
   note_en:                string | null
   calories_estimate_low:  number | null
   calories_estimate_high: number | null
+  meal_type:              string | null
   logged_at:              string
 }
 
@@ -129,6 +130,20 @@ const TAG_COLORS: Record<string, string> = {
   red:    'bg-red-50    text-red-800    border-red-200',
 }
 
+const MEAL_TYPES = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch',     label: 'Lunch'     },
+  { value: 'dinner',    label: 'Dinner'    },
+  { value: 'snack',     label: 'Snack'     },
+] as const
+
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: '🌅 Breakfast',
+  lunch:     '☀️ Lunch',
+  dinner:    '🌙 Dinner',
+  snack:     '🍎 Snack',
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function startOfWeek(): Date {
   const d = new Date()
@@ -159,6 +174,17 @@ function fmtMealDate(iso: string): string {
   if (logDate >= today)     return 'Today'
   if (logDate >= yesterday) return 'Yesterday'
   return fmtShortDate(iso)
+}
+
+// Step 2B — client-side sanitizer for food name hint
+function sanitizeFoodName(raw: string): string {
+  return raw
+    .replace(/<[^>]*>/g, '')                                    // strip HTML tags
+    .replace(/https?:\/\/\S+/gi, '')                            // strip URLs
+    .replace(/[^a-zA-Z0-9\s\-''\u0600-\u06FF]/g, '')           // keep only allowed chars
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100)
 }
 
 // Feature 3 — streak: count consecutive days with ANY log, going back from today
@@ -334,8 +360,8 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   type FoodState = 'idle' | 'analyzing' | 'done' | 'error'
-  const [state,   setState]   = useState<FoodState>('idle')
-  const [result,  setResult]  = useState<{
+  const [state,         setState]        = useState<FoodState>('idle')
+  const [result,        setResult]       = useState<{
     dish_name:              string
     tag:                    string
     note_en:                string
@@ -343,8 +369,21 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
     calories_estimate_low?: number
     calories_estimate_high?: number
   } | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [preview,       setPreview]      = useState<string | null>(null)
+  // Step 2A — meal type selector
+  const [mealType,      setMealType]     = useState<string | null>(null)
+  // Step 2B — optional food name hint
+  const [foodNameHint,  setFoodNameHint] = useState('')
 
+  const handleReset = () => {
+    setState('idle')
+    setPreview(null)
+    setResult(null)
+    setMealType(null)
+    setFoodNameHint('')
+  }
+
+  // Step 3 — include mealType and foodNameHint in FormData
   const handleFile = async (file: File) => {
     setPreview(URL.createObjectURL(file))
     setState('analyzing')
@@ -352,6 +391,8 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
     const fd = new FormData()
     fd.append('image',     file)
     fd.append('patientId', patient.id)
+    if (mealType)                      fd.append('mealType',     mealType)
+    if (foodNameHint.trim().length > 0) fd.append('foodNameHint', sanitizeFoodName(foodNameHint))
     try {
       const res  = await fetch('/api/food-log', { method: 'POST', body: fd })
       const json = await res.json()
@@ -362,6 +403,8 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
       setState('error')
     }
   }
+
+  const sanitizedLen = sanitizeFoodName(foodNameHint).length
 
   return (
     <Card>
@@ -383,12 +426,68 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
       />
 
       {state === 'idle' && (
-        <button type="button" onClick={() => fileRef.current?.click()}
-          className={`w-full py-10 border-2 border-dashed border-gray-200 rounded-card
-                      text-gray-400 text-sm transition-colors hover:border-brand-mid hover:text-brand-mid
-                      cursor-pointer ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-          {t.foodTap}
-        </button>
+        <>
+          {/* Step 2A — Meal type selector */}
+          <div className={`flex gap-2 flex-wrap mb-3 ${isAr ? 'flex-row-reverse' : ''}`}>
+            {MEAL_TYPES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMealType(prev => prev === value ? null : value)}
+                className="font-dm-sans transition-colors"
+                style={{
+                  fontSize:     13,
+                  padding:      '6px 16px',
+                  borderRadius: 20,
+                  border:       `1px solid ${mealType === value ? '#0D5C45' : '#e0e0e0'}`,
+                  background:   mealType === value ? '#0D5C45' : '#fff',
+                  color:        mealType === value ? '#fff'    : '#666',
+                  cursor:       'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Step 2B — Optional food name hint */}
+          <div className="mb-3">
+            <input
+              type="text"
+              maxLength={120}
+              value={foodNameHint}
+              onChange={e => setFoodNameHint(sanitizeFoodName(e.target.value))}
+              placeholder="What did you eat? (optional)"
+              className="w-full font-dm-sans"
+              style={{
+                height:       44,
+                border:       '1px solid #e0e0e0',
+                borderRadius: 12,
+                padding:      '0 14px',
+                fontSize:     14,
+                color:        '#1a1a1a',
+                outline:      'none',
+                boxSizing:    'border-box',
+              }}
+              onFocus={e  => { e.currentTarget.style.borderColor = '#0D5C45' }}
+              onBlur={e   => { e.currentTarget.style.borderColor = '#e0e0e0' }}
+            />
+            {foodNameHint.length > 0 && (
+              <p className="font-dm-sans text-right mt-1"
+                 style={{ fontSize: 11, color: '#bbb' }}>
+                {sanitizedLen}/100
+              </p>
+            )}
+          </div>
+
+          {/* Photo upload button */}
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className={`w-full py-10 border-2 border-dashed border-gray-200 rounded-card
+                        text-gray-400 text-sm transition-colors hover:border-brand-mid hover:text-brand-mid
+                        cursor-pointer ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+            {t.foodTap}
+          </button>
+        </>
       )}
 
       {state === 'analyzing' && (
@@ -427,7 +526,7 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
             </div>
           </div>
           <button type="button"
-            onClick={() => { setState('idle'); setPreview(null); setResult(null) }}
+            onClick={handleReset}
             className={`text-xs text-brand-mid underline cursor-pointer bg-transparent border-none p-0
                         ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
             {t.foodRetry}
@@ -438,7 +537,7 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
       {state === 'error' && (
         <div className="space-y-3">
           <p className={`text-sm text-red-700 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>{t.errorSave}</p>
-          <button type="button" onClick={() => { setState('idle'); setPreview(null) }}
+          <button type="button" onClick={handleReset}
             className={`text-xs text-brand-mid underline cursor-pointer bg-transparent border-none p-0
                         ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
             {t.foodRetry}
@@ -463,6 +562,13 @@ function LastMealSection({ lastMeal, isAr }: { lastMeal: FoodLog; isAr: boolean 
       >
         Last Meal
       </p>
+
+      {/* Step 5 — meal type pill */}
+      {lastMeal.meal_type && MEAL_TYPE_LABELS[lastMeal.meal_type] && (
+        <p className="font-dm-sans mt-1" style={{ fontSize: 11, color: '#888' }}>
+          {MEAL_TYPE_LABELS[lastMeal.meal_type]}
+        </p>
+      )}
 
       <p className="font-dm-sans font-medium mt-1" style={{ fontSize: 16, color: '#1a1a1a' }}>
         {lastMeal.dish_name ?? '—'}
@@ -630,7 +736,7 @@ export default function PatientHomePage() {
         { data: cDates },
       ] = await Promise.all([
         db.from('food_logs')
-          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, logged_at')
+          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, meal_type, logged_at')
           .eq('patient_id', pat.id)
           .order('logged_at', { ascending: false })
           .limit(1),

@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import Link            from 'next/link'
+import { BottomNav }  from '@/components/BottomNav'
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 function IconGrid() {
@@ -88,28 +89,8 @@ export default function DashboardLayout({
         {children}
       </main>
 
-      {/* ── Bottom nav — mobile only ────────────────────────────────────────
-          fixed to bottom, 64px tall, hidden from md upward                */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 h-16
-                   bg-white border-t border-[#e5e5e5]
-                   flex items-center
-                   md:hidden
-                   z-50"
-        aria-label="Mobile navigation"
-      >
-        {navItems.map(({ href, label, Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex-1 flex flex-col items-center justify-center gap-1
-                       text-gray-400 hover:text-brand-dark transition"
-          >
-            <Icon />
-            <span className="font-dm-sans" style={{ fontSize: 11 }}>{label}</span>
-          </Link>
-        ))}
-      </nav>
+      {/* ── Bottom nav — mobile only (client component for active state) ── */}
+      <BottomNav />
 
     </div>
   )

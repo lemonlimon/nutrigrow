@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter }                   from 'next/navigation'
 import { createClient }                from '@supabase/supabase-js'
 import { WeightChart }                 from '@/components/WeightChart'
+import WaterCard                       from './WaterCard'
 
 // ── Supabase browser client ───────────────────────────────────────────────────
 function supabase() {
@@ -26,6 +27,12 @@ interface Patient {
 
 interface WeightLog  { weight_kg: number; logged_at: string }
 interface ContextLog { context: string;   logged_at: string }
+
+// Daily tip
+interface DailyTip {
+  tip_en: string
+  tip_ar: string
+}
 
 // Feature 1 — Last meal
 interface FoodLog {
@@ -219,6 +226,47 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return (
     <div className={`bg-white rounded-card border border-gray-100 shadow-sm p-6 ${className}`}>
       {children}
+    </div>
+  )
+}
+
+// ── Daily Tip card ────────────────────────────────────────────────────────────
+function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
+  return (
+    <div
+      style={{
+        background:   '#0D5C45',
+        borderRadius: 16,
+        padding:      '20px 24px',
+      }}
+    >
+      {/* Label */}
+      <p
+        className="font-dm-sans uppercase"
+        style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.12em', marginBottom: 10 }}
+      >
+        {isAr ? 'نصيحة اليوم' : "Today's insight"}
+      </p>
+
+      {/* English tip */}
+      <p
+        className="font-dm-sans"
+        style={{ fontSize: 14, color: '#ffffff', lineHeight: 1.55, margin: 0 }}
+      >
+        {tip.tip_en}
+      </p>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.15)', margin: '14px 0' }} />
+
+      {/* Arabic tip */}
+      <p
+        className="font-tajawal"
+        dir="rtl"
+        style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.65, margin: 0, textAlign: 'right' }}
+      >
+        {tip.tip_ar}
+      </p>
     </div>
   )
 }
@@ -682,6 +730,7 @@ export default function PatientHomePage() {
   const [todayContext, setTodayContext] = useState<string | null>(null)
   const [lastMeal,     setLastMeal]     = useState<FoodLog | null>(null)   // Feature 1
   const [streak,       setStreak]       = useState(0)                       // Feature 3
+  const [dailyTip,     setDailyTip]     = useState<DailyTip | null>(null)  // Daily tip
   const [loading,      setLoading]      = useState(true)
 
   const isAr          = patient?.preferred_language === 'ar'
@@ -763,6 +812,13 @@ export default function PatientHomePage() {
       ].map(l => l.logged_at)
       setStreak(calcStreak(allDates))
 
+      // Fetch daily tip (fire-and-forget — page renders without blocking)
+      const today = new Date().toISOString().slice(0, 10)
+      fetch(`/api/daily-tip?patientId=${pat.id}&date=${today}`)
+        .then(r => r.json())
+        .then(json => { if (json.success) setDailyTip(json.data) })
+        .catch(() => { /* fail silently — tip is non-critical */ })
+
       setLoading(false)
     }
     load()
@@ -798,12 +854,18 @@ export default function PatientHomePage() {
         )}
       </div>
 
+      {/* Daily Tip — first card, only shown once tip loads */}
+      {dailyTip && <TipCard tip={dailyTip} isAr={isAr} />}
+
       <WeightSection
         patient={patient}
         weightLogs={weightLogs}
         isAr={isAr}
         onSaved={log => setWeightLogs(prev => [log, ...prev].slice(0, 8))}
       />
+
+      {/* Water Tracker — after weight, before food */}
+      <WaterCard patientId={patient.id} isAr={isAr} />
 
       <FoodSection patient={patient} isAr={isAr} />
 

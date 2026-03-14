@@ -1,9 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/']
+// Routes that require a logged-in clinic user
+const CLINIC_ROUTES = ['/dashboard', '/patients']
+
+function isClinicRoute(pathname: string): boolean {
+  return CLINIC_ROUTES.some(
+    route => pathname === route || pathname.startsWith(route + '/')
+  )
+}
 
 export async function middleware(request: NextRequest) {
+  // Must use a mutable response so @supabase/ssr can refresh the session cookie
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -27,15 +35,22 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // IMPORTANT: do not add any logic between createServerClient and getUser()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isPublicRoute = PUBLIC_ROUTES.some(route =>
-    request.nextUrl.pathname.startsWith(route)
-  )
+  const pathname = request.nextUrl.pathname
 
-  if (!user && !isPublicRoute) {
+  // Unauthenticated user hitting a clinic route → send to /login
+  if (!user && isClinicRoute(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Logged-in user hitting /login → send to /dashboard
+  if (user && pathname === '/login') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
@@ -43,6 +58,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Run on all routes except Next.js internals and static assets
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

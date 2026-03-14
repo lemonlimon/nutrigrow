@@ -1,62 +1,165 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
+// AUTH LOGIC — do not modify
+import { useState }     from 'react'
+import { useRouter }    from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+  const router                  = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    // TODO: connect to Supabase auth
-    setLoading(false)
+
+    const supabase = createClient()
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authError) {
+      setError(authError.message)
+      setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
+  }
+
+  // ── Styles ─────────────────────────────────────────────────────────────────
+  const labelStyle: React.CSSProperties = {
+    display:       'block',
+    fontFamily:    'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+    fontSize:      12,
+    fontWeight:    500,
+    color:         '#666',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom:  6,
+  }
+
+  const inputStyle: React.CSSProperties = {
+    display:      'block',
+    width:        '100%',
+    height:       48,
+    border:       '1.5px solid #e8e8e8',
+    borderRadius: 10,
+    padding:      '0 16px',
+    fontFamily:   'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+    fontSize:     15,
+    color:        '#1a1a1a',
+    background:   '#fff',
+    outline:      'none',
+    boxSizing:    'border-box',
+    transition:   'border-color 150ms',
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{error}</div>
-      )}
+    <form onSubmit={handleSubmit}>
+
+      {/* Email */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <label htmlFor="email" style={labelStyle}>Email</label>
         <input
+          id="email"
           type="email"
           required
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           placeholder="doctor@hospital.com"
+          style={inputStyle}
+          onFocus={(e)  => { e.currentTarget.style.borderColor = '#0D5C45' }}
+          onBlur={(e)   => { e.currentTarget.style.borderColor = '#e8e8e8' }}
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+
+      {/* Password */}
+      <div style={{ marginTop: 20 }}>
+        <label htmlFor="password" style={labelStyle}>Password</label>
         <input
+          id="password"
           type="password"
           required
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           placeholder="••••••••"
+          style={inputStyle}
+          onFocus={(e)  => { e.currentTarget.style.borderColor = '#0D5C45' }}
+          onBlur={(e)   => { e.currentTarget.style.borderColor = '#e8e8e8' }}
         />
       </div>
+
+      {/* Submit */}
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-teal-600 text-white py-2.5 rounded-lg font-semibold hover:bg-teal-700 transition disabled:opacity-50"
+        style={{
+          marginTop:      32,
+          display:        'block',
+          width:          '100%',
+          height:         52,
+          background:     loading ? '#0a4a35' : '#0D5C45',
+          borderRadius:   12,
+          border:         'none',
+          color:          '#fff',
+          fontFamily:     'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+          fontSize:       15,
+          fontWeight:     600,
+          letterSpacing:  '0.02em',
+          cursor:         loading ? 'not-allowed' : 'pointer',
+          opacity:        loading ? 0.85 : 1,
+          transition:     'background 200ms, opacity 200ms',
+        }}
+        onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#0a4a35' }}
+        onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#0D5C45' }}
       >
-        {loading ? 'Signing in...' : 'Sign In'}
+        {loading ? 'Signing in…' : 'Sign In'}
       </button>
-      <p className="text-center text-gray-500 text-sm">
-        Don&apos;t have an account?{' '}
-        <Link href="/signup" className="text-teal-600 font-medium hover:underline">
-          Register
-        </Link>
+
+      {/* Error — shown below button */}
+      {error && (
+        <p
+          style={{
+            marginTop:  12,
+            fontFamily: 'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+            fontSize:   13,
+            color:      '#B94040',
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      {/* Divider */}
+      <div style={{ marginTop: 32, borderTop: '1px solid #f0f0f0' }} />
+
+      {/* Footer */}
+      <p
+        style={{
+          marginTop:  16,
+          fontFamily: 'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+          fontSize:   13,
+          color:      '#999',
+          textAlign:  'center',
+        }}
+      >
+        New to MIZAN?{' '}
+        <span
+          style={{ color: '#0D5C45', cursor: 'pointer' }}
+          onClick={() => router.push('/enroll')}
+        >
+          Register your clinic
+        </span>
       </p>
+
     </form>
   )
 }

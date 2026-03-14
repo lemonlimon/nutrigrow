@@ -1,12 +1,14 @@
 // Water Log API
-// GET  /api/water-log?patientId=&date=YYYY-MM-DD  → { glasses: number }
-// POST /api/water-log  body: { patientId, date, glasses }  → upsert
+// Stores ml directly in the `glasses` column (0–2000 ml)
+// GET  /api/water-log?patientId=&date=YYYY-MM-DD  → { glasses: number (ml) }
+// POST /api/water-log  body: { patientId, date, glasses }  → upsert ml value
 
 import { NextResponse }      from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const MAX_ML       = 2000
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -58,8 +60,12 @@ export async function POST(request: Request) {
   if (!DATE_PATTERN.test(date)) {
     return NextResponse.json({ success: false, error: 'Invalid date format' }, { status: 400 })
   }
-  if (!Number.isInteger(glasses) || glasses < 0 || glasses > 8) {
-    return NextResponse.json({ success: false, error: 'glasses must be an integer 0–8' }, { status: 400 })
+  // glasses now stores ml: must be a number 0–2000, multiples of 50 allowed
+  if (typeof glasses !== 'number' || glasses < 0 || glasses > MAX_ML || !Number.isFinite(glasses)) {
+    return NextResponse.json(
+      { success: false, error: `glasses (ml) must be a number between 0 and ${MAX_ML}` },
+      { status: 400 }
+    )
   }
 
   const admin = createAdminClient()
@@ -67,7 +73,7 @@ export async function POST(request: Request) {
     {
       patient_id:  patientId,
       logged_date: date,
-      glasses,
+      glasses,                   // storing ml value in this column
     },
     { onConflict: 'patient_id,logged_date' }
   )

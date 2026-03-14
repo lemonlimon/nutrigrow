@@ -865,7 +865,7 @@ export default function PatientHomePage() {
       />
 
       {/* Water Tracker — after weight, before food */}
-      <WaterCard patientId={patient.id} isAr={isAr} />
+      <WaterCard patientId={patient.id} />
 
       <FoodSection patient={patient} isAr={isAr} />
 

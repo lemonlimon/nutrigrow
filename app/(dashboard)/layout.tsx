@@ -1,5 +1,3 @@
-// CHANGE 4: emoji icons replaced with clean inline SVG
-// CHANGE 6: confirmed — only Dashboard and Patients remain
 import Link from 'next/link'
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
@@ -43,8 +41,9 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex bg-canvas">
 
-      {/* Sidebar */}
-      <aside className="w-60 bg-white border-r border-gray-100 flex flex-col">
+      {/* ── Sidebar — desktop only ──────────────────────────────────────────
+          hidden on mobile, shown as a flex column from md upward           */}
+      <aside className="hidden md:flex w-60 bg-white border-r border-gray-100 flex-col">
 
         {/* Brand */}
         <div className="px-6 py-7 border-b border-gray-100">
@@ -56,7 +55,7 @@ export default function DashboardLayout({
           </p>
         </div>
 
-        {/* Nav */}
+        {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {navItems.map(({ href, label, Icon }) => (
             <Link
@@ -81,10 +80,37 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 p-8 overflow-auto">
+      {/* ── Main content ────────────────────────────────────────────────────
+          - Mobile:  full width, 16px side padding, 80px bottom padding
+            (so content clears the fixed bottom nav)
+          - Desktop: flex-1, 32px padding all round                        */}
+      <main className="flex-1 px-4 py-6 pb-24 md:p-8 overflow-auto">
         {children}
       </main>
+
+      {/* ── Bottom nav — mobile only ────────────────────────────────────────
+          fixed to bottom, 64px tall, hidden from md upward                */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 h-16
+                   bg-white border-t border-[#e5e5e5]
+                   flex items-center
+                   md:hidden
+                   z-50"
+        aria-label="Mobile navigation"
+      >
+        {navItems.map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex-1 flex flex-col items-center justify-center gap-1
+                       text-gray-400 hover:text-brand-dark transition"
+          >
+            <Icon />
+            <span className="font-dm-sans" style={{ fontSize: 11 }}>{label}</span>
+          </Link>
+        ))}
+      </nav>
+
     </div>
   )
 }

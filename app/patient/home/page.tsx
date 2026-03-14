@@ -5,7 +5,7 @@ import { useRouter }                   from 'next/navigation'
 import { createClient }                from '@supabase/supabase-js'
 import { WeightChart }                 from '@/components/WeightChart'
 
-// ── Supabase browser client (session stored in localStorage after signUp) ─────
+// ── Supabase browser client ───────────────────────────────────────────────────
 function supabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +26,16 @@ interface Patient {
 
 interface WeightLog  { weight_kg: number; logged_at: string }
 interface ContextLog { context: string;   logged_at: string }
+
+// Feature 1 — Last meal
+interface FoodLog {
+  dish_name:              string | null
+  tag:                    string | null
+  note_en:                string | null
+  calories_estimate_low:  number | null
+  calories_estimate_high: number | null
+  logged_at:              string
+}
 
 type ContextOption = 'regular' | 'family_gathering' | 'ramadan' | 'travel' | 'stressed'
 
@@ -119,10 +129,11 @@ const TAG_COLORS: Record<string, string> = {
   red:    'bg-red-50    text-red-800    border-red-200',
 }
 
+// ── Date helpers ──────────────────────────────────────────────────────────────
 function startOfWeek(): Date {
   const d = new Date()
   const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day   // back to Monday
+  const diff = day === 0 ? -6 : 1 - day
   d.setDate(d.getDate() + diff)
   d.setHours(0, 0, 0, 0)
   return d
@@ -132,6 +143,35 @@ function startOfDay(): Date {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
   return d
+}
+
+// "Mar 14"
+function fmtShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// "Today" / "Yesterday" / "Mar 12"
+function fmtMealDate(iso: string): string {
+  const logDate   = new Date(iso)
+  const today     = startOfDay()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (logDate >= today)     return 'Today'
+  if (logDate >= yesterday) return 'Yesterday'
+  return fmtShortDate(iso)
+}
+
+// Feature 3 — streak: count consecutive days with ANY log, going back from today
+function calcStreak(allLogDates: string[]): number {
+  const dateSet = new Set(allLogDates.map(d => d.slice(0, 10)))   // "YYYY-MM-DD"
+  let streak = 0
+  for (let i = 0; i < 30; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    if (dateSet.has(key)) { streak++ } else { break }
+  }
+  return streak
 }
 
 // ── Layout helpers ────────────────────────────────────────────────────────────
@@ -157,7 +197,7 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   )
 }
 
-// ── Feature 1: Weight check-in ────────────────────────────────────────────────
+// ── Feature 1: Weight check-in (with history list) ────────────────────────────
 function WeightSection({
   patient, weightLogs, isAr, onSaved,
 }: {
@@ -171,7 +211,6 @@ function WeightSection({
   const [value,  setValue]  = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
-  // Chart: ascending logs for WeightChart; baseline comes from patient enrollment
   const chartPoints = [...weightLogs].reverse()
 
   const handleSave = async () => {
@@ -196,17 +235,57 @@ function WeightSection({
         {t.weightTitle}
       </h2>
 
-      <div className="mb-5">
+      {/* Chart */}
+      <div className="mb-4">
         {chartPoints.length > 0
           ? <WeightChart
               points={chartPoints}
               baseline={{ weight_kg: patient.weight_kg, enrolled_at: patient.enrolled_at }}
               unit={unit}
             />
-          : <p className={`text-sm text-gray-400 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>{t.weightNoHistory}</p>
+          : <p className={`text-sm text-gray-400 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+              {t.weightNoHistory}
+            </p>
         }
       </div>
 
+      {/* Feature 2 — Weight history: last 3 rows, only if 2+ logs exist */}
+      {weightLogs.length >= 2 && (
+        <div className="mb-4 pt-1 border-t border-gray-100">
+          {weightLogs.slice(0, 3).map((log, i) => {
+            const prev  = weightLogs[i + 1]
+            const delta = prev != null ? log.weight_kg - prev.weight_kg : null
+            const deltaColor =
+              delta == null || delta === 0 ? '#999'
+              : delta > 0 ? '#B94040'
+              : '#1D9E75'
+            const deltaLabel =
+              delta == null  ? '—'
+              : delta === 0  ? '—'
+              : delta > 0    ? `↑ ${delta.toFixed(1)} kg`
+              :                `↓ ${Math.abs(delta).toFixed(1)} kg`
+            return (
+              <div key={i}>
+                {i > 0 && <div style={{ height: 1, background: '#f0f0f0' }} />}
+                <div className="flex items-center justify-between" style={{ padding: '10px 0' }}>
+                  <span className="font-dm-sans text-[13px]" style={{ color: '#666' }}>
+                    {fmtShortDate(log.logged_at)}
+                  </span>
+                  <span className="font-dm-sans text-[13px] font-medium" style={{ color: '#1a1a1a' }}>
+                    {log.weight_kg} kg
+                  </span>
+                  <span className="font-dm-sans text-[13px]"
+                        style={{ color: deltaColor, minWidth: 72, textAlign: 'right' }}>
+                    {deltaLabel}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Input row */}
       <div className={`flex gap-2 ${isAr ? 'flex-row-reverse' : ''}`}>
         <input
           type="number"
@@ -370,6 +449,53 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
   )
 }
 
+// ── Feature 1 (new): Last meal card ──────────────────────────────────────────
+function LastMealSection({ lastMeal, isAr }: { lastMeal: FoodLog; isAr: boolean }) {
+  const t = T[isAr ? 'ar' : 'en']
+  return (
+    <div
+      className="bg-white rounded-card border border-gray-100 shadow-sm"
+      style={{ padding: '20px 24px' }}
+    >
+      <p
+        className="font-dm-sans uppercase"
+        style={{ fontSize: 11, color: '#888', letterSpacing: '0.08em' }}
+      >
+        Last Meal
+      </p>
+
+      <p className="font-dm-sans font-medium mt-1" style={{ fontSize: 16, color: '#1a1a1a' }}>
+        {lastMeal.dish_name ?? '—'}
+      </p>
+
+      {lastMeal.calories_estimate_low != null && lastMeal.calories_estimate_high != null && (
+        <p className="font-dm-sans mt-0.5" style={{ fontSize: 13, color: '#1D9E75' }}>
+          ~{lastMeal.calories_estimate_low}–{lastMeal.calories_estimate_high} kcal
+        </p>
+      )}
+
+      {lastMeal.tag && (
+        <span
+          className={`inline-block text-xs px-2.5 py-1 rounded-full border font-medium font-dm-sans mt-1.5
+                      ${TAG_COLORS[lastMeal.tag] ?? TAG_COLORS.yellow}`}
+        >
+          {t.tagLabels[lastMeal.tag as keyof typeof t.tagLabels] ?? lastMeal.tag}
+        </span>
+      )}
+
+      {lastMeal.note_en && (
+        <p className="font-dm-sans mt-1.5" style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+          {lastMeal.note_en}
+        </p>
+      )}
+
+      <p className="font-dm-sans mt-1" style={{ fontSize: 11, color: '#bbb' }}>
+        {fmtMealDate(lastMeal.logged_at)}
+      </p>
+    </div>
+  )
+}
+
 // ── Feature 3: Context tap ────────────────────────────────────────────────────
 function ContextSection({
   patient, todayContext, isRamadanMode, isAr, onLogged,
@@ -448,10 +574,12 @@ export default function PatientHomePage() {
   const [weightLogs,   setWeightLogs]   = useState<WeightLog[]>([])
   const [contextLogs,  setContextLogs]  = useState<ContextLog[]>([])
   const [todayContext, setTodayContext] = useState<string | null>(null)
+  const [lastMeal,     setLastMeal]     = useState<FoodLog | null>(null)   // Feature 1
+  const [streak,       setStreak]       = useState(0)                       // Feature 3
   const [loading,      setLoading]      = useState(true)
 
-  const isAr         = patient?.preferred_language === 'ar'
-  const t            = T[isAr ? 'ar' : 'en']
+  const isAr          = patient?.preferred_language === 'ar'
+  const t             = T[isAr ? 'ar' : 'en']
   const isRamadanMode = contextLogs.filter(l => l.context === 'ramadan').length >= 3
 
   useEffect(() => {
@@ -469,6 +597,7 @@ export default function PatientHomePage() {
       if (patErr || !pat) { router.replace('/patient/login'); return }
       setPatient(pat as Patient)
 
+      // Existing queries
       const { data: wLogs } = await db
         .from('weight_logs')
         .select('weight_kg, logged_at')
@@ -488,10 +617,50 @@ export default function PatientHomePage() {
       const todayLog = (cLogs ?? []).find(l => new Date(l.logged_at) >= startOfDay())
       setTodayContext(todayLog?.context ?? null)
 
+      // New parallel queries: last meal + streak date data
+      const streakStart = new Date()
+      streakStart.setDate(streakStart.getDate() - 30)
+      streakStart.setHours(0, 0, 0, 0)
+      const streakISO = streakStart.toISOString()
+
+      const [
+        { data: lastMealData },
+        { data: wDates },
+        { data: fDates },
+        { data: cDates },
+      ] = await Promise.all([
+        db.from('food_logs')
+          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, logged_at')
+          .eq('patient_id', pat.id)
+          .order('logged_at', { ascending: false })
+          .limit(1),
+        db.from('weight_logs')
+          .select('logged_at')
+          .eq('patient_id', pat.id)
+          .gte('logged_at', streakISO),
+        db.from('food_logs')
+          .select('logged_at')
+          .eq('patient_id', pat.id)
+          .gte('logged_at', streakISO),
+        db.from('context_logs')
+          .select('logged_at')
+          .eq('patient_id', pat.id)
+          .gte('logged_at', streakISO),
+      ])
+
+      if (lastMealData?.[0]) setLastMeal(lastMealData[0] as FoodLog)
+
+      const allDates = [
+        ...(wDates ?? []),
+        ...(fDates ?? []),
+        ...(cDates ?? []),
+      ].map(l => l.logged_at)
+      setStreak(calcStreak(allDates))
+
       setLoading(false)
     }
     load()
-  }, [])
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -501,13 +670,27 @@ export default function PatientHomePage() {
     )
   }
 
-  if (!patient) return null   // redirect in progress
+  if (!patient) return null
 
   return (
     <Shell isAr={isAr}>
-      <p className={`text-xl text-gray-900 px-1 ${isAr ? 'font-tajawal' : 'font-playfair'}`}>
-        {t.greeting(patient.first_name)}
-      </p>
+
+      {/* Greeting + Feature 3: streak indicator */}
+      <div className="px-1">
+        <p className={`text-xl text-gray-900 ${isAr ? 'font-tajawal' : 'font-playfair'}`}>
+          {t.greeting(patient.first_name)}
+        </p>
+        {streak >= 1 && (
+          <p
+            className="font-dm-sans mt-1"
+            style={{ fontSize: 13, color: streak >= 2 ? '#0D5C45' : '#666' }}
+          >
+            {streak >= 2
+              ? `🔥 ${streak} day streak`
+              : 'Good start — come back tomorrow'}
+          </p>
+        )}
+      </div>
 
       <WeightSection
         patient={patient}
@@ -517,6 +700,9 @@ export default function PatientHomePage() {
       />
 
       <FoodSection patient={patient} isAr={isAr} />
+
+      {/* Feature 1: last meal card — only shown if a food log exists */}
+      {lastMeal && <LastMealSection lastMeal={lastMeal} isAr={isAr} />}
 
       <ContextSection
         patient={patient}
@@ -529,6 +715,7 @@ export default function PatientHomePage() {
           setTodayContext(ctx)
         }}
       />
+
     </Shell>
   )
 }

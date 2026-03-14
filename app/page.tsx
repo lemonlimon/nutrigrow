@@ -99,70 +99,6 @@ export default function HomePage() {
             style={{ gap: 24 }}
           >
 
-            {/* CARD 1 — Clinician */}
-            <div
-              className="flex-1"
-              style={{
-                background:   '#ffffff',
-                borderRadius: 16,
-                border:       '1px solid #e8e8e8',
-                padding:      36,
-                display:      'flex',
-                flexDirection:'column',
-              }}
-            >
-              <IconPerson color="#0D5C45" />
-
-              <h2
-                style={{
-                  fontFamily:  'var(--font-playfair), Playfair Display, Georgia, serif',
-                  fontSize:    22,
-                  fontWeight:  600,
-                  color:       '#1a1a1a',
-                  marginTop:   12,
-                  marginBottom: 0,
-                }}
-              >
-                I&rsquo;m a clinician
-              </h2>
-
-              <p
-                style={{
-                  fontFamily:   'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
-                  fontSize:     13,
-                  color:        '#666',
-                  marginTop:    6,
-                  marginBottom: 28,
-                  lineHeight:   1.5,
-                  flexGrow:     1,
-                }}
-              >
-                Manage your patients and view weekly digests
-              </p>
-
-              <Link
-                href="/login"
-                style={{
-                  display:        'block',
-                  width:          '100%',
-                  height:         48,
-                  background:     '#0D5C45',
-                  borderRadius:   12,
-                  border:         'none',
-                  color:          '#fff',
-                  fontFamily:     'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
-                  fontSize:       14,
-                  fontWeight:     600,
-                  textAlign:      'center',
-                  lineHeight:     '48px',
-                  textDecoration: 'none',
-                  transition:     'opacity 200ms',
-                }}
-              >
-                Sign In to Dashboard
-              </Link>
-            </div>
-
             {/* CARD 2 — Patient */}
             <div
               className="flex-1"
@@ -225,6 +161,70 @@ export default function HomePage() {
                 }}
               >
                 Go to My Home
+              </Link>
+            </div>
+
+            {/* CARD 1 — Clinician */}
+            <div
+              className="flex-1"
+              style={{
+                background:   '#ffffff',
+                borderRadius: 16,
+                border:       '1px solid #e8e8e8',
+                padding:      36,
+                display:      'flex',
+                flexDirection:'column',
+              }}
+            >
+              <IconPerson color="#0D5C45" />
+
+              <h2
+                style={{
+                  fontFamily:  'var(--font-playfair), Playfair Display, Georgia, serif',
+                  fontSize:    22,
+                  fontWeight:  600,
+                  color:       '#1a1a1a',
+                  marginTop:   12,
+                  marginBottom: 0,
+                }}
+              >
+                I&rsquo;m a clinician
+              </h2>
+
+              <p
+                style={{
+                  fontFamily:   'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+                  fontSize:     13,
+                  color:        '#666',
+                  marginTop:    6,
+                  marginBottom: 28,
+                  lineHeight:   1.5,
+                  flexGrow:     1,
+                }}
+              >
+                Manage your patients and view weekly digests
+              </p>
+
+              <Link
+                href="/login"
+                style={{
+                  display:        'block',
+                  width:          '100%',
+                  height:         48,
+                  background:     '#0D5C45',
+                  borderRadius:   12,
+                  border:         'none',
+                  color:          '#fff',
+                  fontFamily:     'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+                  fontSize:       14,
+                  fontWeight:     600,
+                  textAlign:      'center',
+                  lineHeight:     '48px',
+                  textDecoration: 'none',
+                  transition:     'opacity 200ms',
+                }}
+              >
+                Sign In to Dashboard
               </Link>
             </div>
 

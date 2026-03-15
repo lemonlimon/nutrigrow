@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter }                   from 'next/navigation'
 import { createClient }                from '@supabase/supabase-js'
+import { format }                      from 'date-fns'
 import { WeightChart }                 from '@/components/WeightChart'
 import WaterCard                       from './WaterCard'
 
@@ -1276,7 +1277,7 @@ function CalorieRingCard({
       </p>
 
       {mealCount === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4, paddingBottom: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8, paddingTop: 4, paddingBottom: 4 }}>
           <svg width={88} height={88} viewBox="0 0 88 88">
             <circle
               cx={44} cy={44} r={34}
@@ -1287,6 +1288,9 @@ function CalorieRingCard({
           </svg>
           <p className="font-dm-sans" style={{ fontSize: 13, color: '#CCC', margin: 0 }}>
             0 / 1,800 kcal
+          </p>
+          <p className="font-dm-sans" style={{ fontSize: 12, color: '#BBB', fontStyle: 'italic', margin: 0 }}>
+            Tap 📸 to log your first meal today
           </p>
         </div>
       ) : (
@@ -1401,103 +1405,136 @@ function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
   })
 
   return (
+    // Outer sticky wrapper — contains month header + scrollable row
     <div
-      className="mizan-cal-strip"
       style={{
-        position:       'sticky',
-        top:            52,
-        zIndex:         40,
-        background:     '#F2F2F7',
-        padding:        '10px 8px 14px',
-        display:        'flex',
-        overflowX:      'scroll',
-        scrollSnapType: 'x mandatory',
-        scrollbarWidth: 'none',
-        gap:            4,
-      } as React.CSSProperties}
+        position:   'sticky',
+        top:        52,
+        zIndex:     40,
+        background: '#F2F2F7',
+      }}
     >
-      {days.map((d, i) => {
-        const dStr     = d.toDateString()
-        const isToday  = dStr === todayStr
-        const isFuture = d > today && !isToday
-        const hasLog   = loggedDates.has(dStr)
-        const isPast   = !isToday && !isFuture
+      {/* Static month/year label */}
+      <p
+        className="font-dm-sans"
+        style={{ fontSize: 13, color: '#666', textAlign: 'center', padding: '8px 0 4px', margin: 0 }}
+      >
+        {format(today, 'MMMM yyyy')}
+      </p>
 
-        // Circle appearance
-        const circleBg: string =
-          isToday ? '#0D5C45' :
-          isFuture ? 'transparent' :
-          'white'
-        const circleBorder: string =
-          isToday && hasLog ? '3px solid #1D9E75' :
-          isToday           ? 'none' :
-          hasLog            ? '2px solid #1D9E75' :
-          isFuture          ? '1.5px solid #EEEEEE' :
-                              '1.5px solid #E0E0E0'
-        const numColor = isToday ? 'white' : hasLog ? '#1D9E75' : '#CCC'
-        const numBold  = isToday || hasLog
+      {/* Scrollable day cells */}
+      <div
+        className="mizan-cal-strip"
+        style={{
+          display:        'flex',
+          overflowX:      'scroll',
+          scrollSnapType: 'x mandatory',
+          scrollbarWidth: 'none',
+          padding:        '0 8px 14px',
+          gap:            4,
+        } as React.CSSProperties}
+      >
+        {days.map((d, i) => {
+          const dStr        = d.toDateString()
+          const isToday     = dStr === todayStr
+          const isFuture    = d > today && !isToday
+          const hasLog      = loggedDates.has(dStr)
+          const isPast      = !isToday && !isFuture
+          // Show month label on 1st of month OR first cell in array
+          const showMonth   = d.getDate() === 1 || i === 0
 
-        // Dot appearance
-        const showDot   = (isToday && hasLog) || isPast
-        const dotBg     = hasLog ? (isToday ? 'white' : '#1D9E75') : 'transparent'
-        const dotBorder = isPast && !hasLog ? '1px solid #CCC' : 'none'
+          // Circle appearance
+          const circleBg: string =
+            isToday ? '#0D5C45' :
+            isFuture ? 'transparent' :
+            'white'
+          const circleBorder: string =
+            isToday && hasLog ? '3px solid #1D9E75' :
+            isToday           ? 'none' :
+            hasLog            ? '2px solid #1D9E75' :
+            isFuture          ? '1.5px solid #EEEEEE' :
+                                '1.5px solid #E0E0E0'
+          const numColor = isToday ? 'white' : hasLog ? '#1D9E75' : '#CCC'
+          const numBold  = isToday || hasLog
 
-        return (
-          <div
-            key={i}
-            ref={isToday ? todayRef : undefined}
-            style={{
-              display:         'flex',
-              flexDirection:   'column',
-              alignItems:      'center',
-              minWidth:        44,
-              scrollSnapAlign: 'center',
-              flexShrink:      0,
-            } as React.CSSProperties}
-          >
-            <span
-              className="font-dm-sans"
-              style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', marginBottom: 6, lineHeight: 1 }}
-            >
-              {DAY_LETTERS[d.getDay()]}
-            </span>
+          // Dot appearance
+          const showDot   = (isToday && hasLog) || isPast
+          const dotBg     = hasLog ? (isToday ? 'white' : '#1D9E75') : 'transparent'
+          const dotBorder = isPast && !hasLog ? '1px solid #CCC' : 'none'
 
+          return (
             <div
+              key={i}
+              ref={isToday ? todayRef : undefined}
               style={{
-                width:          40,
-                height:         40,
-                borderRadius:   '50%',
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                background:     circleBg,
-                border:         circleBorder,
-                boxSizing:      'border-box',
-              }}
+                display:         'flex',
+                flexDirection:   'column',
+                alignItems:      'center',
+                minWidth:        44,
+                scrollSnapAlign: 'center',
+                flexShrink:      0,
+              } as React.CSSProperties}
             >
+              {/* Month boundary label — always reserves space, visible on boundary */}
+              <span
+                className="font-dm-sans uppercase"
+                style={{
+                  fontSize:   10,
+                  color:      showMonth ? '#999' : 'transparent',
+                  marginBottom: 2,
+                  lineHeight: 1,
+                  userSelect: 'none',
+                }}
+              >
+                {format(d, 'MMM')}
+              </span>
+
+              {/* Day letter */}
               <span
                 className="font-dm-sans"
-                style={{ fontSize: 14, color: numColor, fontWeight: numBold ? 700 : 400 }}
+                style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', marginBottom: 4, lineHeight: 1 }}
               >
-                {d.getDate()}
+                {DAY_LETTERS[d.getDay()]}
               </span>
-            </div>
 
-            {/* Consistent dot row */}
-            <div
-              style={{
-                width:        3,
-                height:       3,
-                borderRadius: '50%',
-                marginTop:    4,
-                background:   showDot ? dotBg : 'transparent',
-                border:       showDot ? dotBorder : 'none',
-                boxSizing:    'border-box',
-              }}
-            />
-          </div>
-        )
-      })}
+              {/* Circle */}
+              <div
+                style={{
+                  width:          40,
+                  height:         40,
+                  borderRadius:   '50%',
+                  display:        'flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  background:     circleBg,
+                  border:         circleBorder,
+                  boxSizing:      'border-box',
+                }}
+              >
+                <span
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: numColor, fontWeight: numBold ? 700 : 400 }}
+                >
+                  {d.getDate()}
+                </span>
+              </div>
+
+              {/* Consistent dot row */}
+              <div
+                style={{
+                  width:        3,
+                  height:       3,
+                  borderRadius: '50%',
+                  marginTop:    4,
+                  background:   showDot ? dotBg : 'transparent',
+                  border:       showDot ? dotBorder : 'none',
+                  boxSizing:    'border-box',
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1644,9 +1681,8 @@ export default function PatientHomePage() {
         setTodayCalories({ low, high, mealCount: todayFoodData.length, proteinG, carbsG, fatG })
       }
 
-      // Fetch today's water (fire-and-forget) — use LOCAL date to avoid UTC-offset bug
-      const _now  = new Date()
-      const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
+      // Fetch today's water (fire-and-forget) — LOCAL date via date-fns (avoids UTC-offset bug)
+      const today = format(new Date(), 'yyyy-MM-dd')
       fetch(`/api/water-log?patientId=${pat.id}&date=${today}`)
         .then(r => r.json())
         .then(json => { if (json.success) setWaterMl(json.data.glasses ?? 0) })
@@ -1778,14 +1814,6 @@ export default function PatientHomePage() {
           fatG={todayCalories?.fatG           ?? 0}
           onTap={() => scrollTo(foodRef)}
         />
-        {(todayCalories?.mealCount ?? 0) === 0 && (
-          <p
-            className="font-dm-sans"
-            style={{ fontSize: 12, color: '#BBB', textAlign: 'center', fontStyle: 'italic', marginTop: -8 }}
-          >
-            Tap 📸 to log your first meal today
-          </p>
-        )}
 
         <FoodSection
           patient={patient}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter }           from 'next/navigation'
 import { createClient }        from '@supabase/supabase-js'
+import { format, subDays }     from 'date-fns'
 import { WeightChart }         from '@/components/WeightChart'
 
 // ── Supabase browser client ───────────────────────────────────────────────────
@@ -37,13 +38,12 @@ function fmtShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Uses date-fns to compute streak in LOCAL timezone
 function calcStreak(logDates: string[]): number {
   const dateSet = new Set(logDates.map(d => d.slice(0, 10)))
   let streak = 0
-  for (let i = 0; i < 30; i++) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
+  for (let i = 0; i < 60; i++) {
+    const key = format(subDays(new Date(), i), 'yyyy-MM-dd')
     if (dateSet.has(key)) { streak++ } else { break }
   }
   return streak
@@ -90,9 +90,9 @@ export default function PatientProgressPage() {
   const [patient,       setPatient]       = useState<Patient | null>(null)
   const [recentWeights, setRecentWeights] = useState<WeightLog[]>([])
   const [firstWeight,   setFirstWeight]   = useState<WeightLog | null>(null)
-  const [daysLogged,    setDaysLogged]    = useState(0)
   const [weeklyAvg,     setWeeklyAvg]     = useState<WeeklyAvg | null>(null)
   const [streak,        setStreak]        = useState(0)
+  const [photoStreak,   setPhotoStreak]   = useState(0)
   const [loading,       setLoading]       = useState(true)
 
   useEffect(() => {
@@ -122,7 +122,6 @@ export default function PatientProgressPage() {
       const [
         { data: wRecent },
         { data: wFirst  },
-        { data: allDates },
         { data: weekFood },
         { data: streakFood },
       ] = await Promise.all([
@@ -140,11 +139,6 @@ export default function PatientProgressPage() {
           .order('logged_at', { ascending: true })
           .limit(1),
 
-        // All food log dates for distinct-day count
-        db.from('food_logs')
-          .select('logged_at')
-          .eq('patient_id', pat.id),
-
         // Food logs last 7 days for weekly averages
         db.from('food_logs')
           .select('calories_estimate_low, calories_estimate_high, protein_g, carbs_g, fat_g, logged_at')
@@ -160,10 +154,6 @@ export default function PatientProgressPage() {
 
       setRecentWeights(wRecent ?? [])
       setFirstWeight(wFirst?.[0] ?? null)
-
-      // Distinct calendar dates with at least one food log
-      const distinctDates = new Set((allDates ?? []).map(r => r.logged_at.slice(0, 10)))
-      setDaysLogged(distinctDates.size)
 
       // Weekly averages — divide by days that have logs, not by 7
       if (weekFood && weekFood.length > 0) {
@@ -181,7 +171,10 @@ export default function PatientProgressPage() {
         })
       }
 
-      setStreak(calcStreak((streakFood ?? []).map(r => r.logged_at)))
+      const foodDates = (streakFood ?? []).map(r => r.logged_at)
+      setPhotoStreak(calcStreak(foodDates))
+      // General streak uses food logs too (same source for now — photo is primary activity)
+      setStreak(calcStreak(foodDates))
 
       setLoading(false)
     }
@@ -243,39 +236,79 @@ export default function PatientProgressPage() {
           </p>
         </div>
 
-        {/* ── Section A — Two stat cards ── */}
+        {/* ── Section A — Streak cards ── */}
         <div style={{ display: 'flex', gap: 12 }}>
 
+          {/* Card 1 — Logging streak */}
           <PageCard style={{ flex: 1 }}>
-            <div style={{ fontSize: 22, marginBottom: 8 }}>⚖️</div>
-            <div
-              className="font-dm-sans font-bold"
-              style={{ fontSize: 20, color: '#1A1A1A', lineHeight: 1.1 }}
-            >
-              {latestWeight ? `${latestWeight.weight_kg} kg` : '—'}
-            </div>
-            <div
-              className="font-dm-sans uppercase"
-              style={{ fontSize: 10, color: '#999', letterSpacing: '0.06em', marginTop: 5 }}
-            >
-              Last weight
-            </div>
+            {streak >= 1 ? (
+              <>
+                <div
+                  className="font-dm-sans font-bold"
+                  style={{ fontSize: 36, color: '#F5A623', lineHeight: 1 }}
+                >
+                  🔥 {streak}
+                </div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: '#999', marginTop: 4 }}
+                >
+                  day streak
+                </div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 11, color: '#CCC', marginTop: 2 }}
+                >
+                  consecutive days logged
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>🔥</div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: '#CCC', fontStyle: 'italic' }}
+                >
+                  Start today!
+                </div>
+              </>
+            )}
           </PageCard>
 
+          {/* Card 2 — Photo streak */}
           <PageCard style={{ flex: 1 }}>
-            <div style={{ fontSize: 22, marginBottom: 8 }}>📅</div>
-            <div
-              className="font-dm-sans font-bold"
-              style={{ fontSize: 20, color: '#1A1A1A', lineHeight: 1.1 }}
-            >
-              {daysLogged} days
-            </div>
-            <div
-              className="font-dm-sans uppercase"
-              style={{ fontSize: 10, color: '#999', letterSpacing: '0.06em', marginTop: 5 }}
-            >
-              Days logged
-            </div>
+            {photoStreak >= 1 ? (
+              <>
+                <div
+                  className="font-dm-sans font-bold"
+                  style={{ fontSize: 36, color: '#E8623A', lineHeight: 1 }}
+                >
+                  📸 {photoStreak}
+                </div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: '#999', marginTop: 4 }}
+                >
+                  photo streak
+                </div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 11, color: '#CCC', marginTop: 2 }}
+                >
+                  consecutive meal photos
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
+                <div
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: '#CCC', fontStyle: 'italic' }}
+                >
+                  Start today!
+                </div>
+              </>
+            )}
           </PageCard>
 
         </div>
@@ -413,18 +446,6 @@ export default function PatientProgressPage() {
           )}
         </PageCard>
 
-        {/* ── Section E — Logging streak ── */}
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          {streak >= 1 ? (
-            <p className="font-playfair" style={{ fontSize: 20, color: '#0D5C45' }}>
-              🔥 {streak} day streak
-            </p>
-          ) : (
-            <p className="font-dm-sans" style={{ fontSize: 14, color: '#999' }}>
-              Log a meal today to start your streak
-            </p>
-          )}
-        </div>
 
       </div>
     </div>

@@ -193,30 +193,6 @@ export default async function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-    {/* ── Sticky app header ── */}
-    <div
-      className="-mx-4 -mt-6 md:-mx-8 md:-mt-8"
-      style={{
-        position:       'sticky',
-        top:            0,
-        zIndex:         50,
-        height:         52,
-        background:     '#FAFAF8',
-        borderBottom:   '1px solid #F0F0F0',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        padding:        '0 20px',
-      }}
-    >
-      <span className="font-tajawal" style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1 }}>
-        ميزان
-      </span>
-      <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
-        MIZAN
-      </span>
-    </div>
-
     {/* ── Today's date ── */}
     <p
       className="font-dm-sans"

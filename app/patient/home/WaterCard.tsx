@@ -5,6 +5,7 @@
 // bottleSize persists in localStorage key "mizan_bottle_size"
 
 import { useState, useEffect } from 'react'
+import { format }              from 'date-fns'
 
 const GOAL = 2000 // ml
 
@@ -24,8 +25,7 @@ const BOTTLE_SIZES = [
 ] as const
 
 function todayISO(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return format(new Date(), 'yyyy-MM-dd')
 }
 
 interface WaterCardProps {

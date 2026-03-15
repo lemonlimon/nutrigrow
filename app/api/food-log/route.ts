@@ -187,10 +187,13 @@ export async function POST(request: Request) {
     dish_name:              analysis.dish_name,
     calories_estimate_low:  analysis.calories_estimate_low,
     calories_estimate_high: analysis.calories_estimate_high,
+    protein_g:              analysis.protein_g,
+    carbs_g:                analysis.carbs_g,
+    fat_g:                  analysis.fat_g,
     tag:                    analysis.tag,
     note_en:                analysis.note_en,
     note_ar:                analysis.note_ar,
-    meal_type:              effectiveMealType,             // Step 4E
+    meal_type:              effectiveMealType,
   })
 
   if (insertError) {

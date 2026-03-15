@@ -41,6 +41,9 @@ interface FoodLog {
   note_en:                string | null
   calories_estimate_low:  number | null
   calories_estimate_high: number | null
+  protein_g:              number | null
+  carbs_g:                number | null
+  fat_g:                  number | null
   meal_type:              string | null
   logged_at:              string
 }
@@ -271,6 +274,41 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
   )
 }
 
+// ── Macro Pills ───────────────────────────────────────────────────────────────
+function MacroPills({
+  protein_g, carbs_g, fat_g,
+}: {
+  protein_g?: number | null
+  carbs_g?:   number | null
+  fat_g?:     number | null
+}) {
+  if (protein_g == null || carbs_g == null || fat_g == null) return null
+  const pills = [
+    { emoji: '🥩', label: `${protein_g}g protein` },
+    { emoji: '🌾', label: `${carbs_g}g carbs`   },
+    { emoji: '🫒', label: `${fat_g}g fat`        },
+  ]
+  return (
+    <div className="flex gap-2 flex-wrap mt-1.5">
+      {pills.map(({ emoji, label }) => (
+        <span
+          key={label}
+          className="font-dm-sans"
+          style={{
+            background:   '#F5F5F5',
+            borderRadius: 8,
+            padding:      '4px 10px',
+            fontSize:     12,
+            color:        '#666',
+          }}
+        >
+          {emoji} {label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // ── Feature 1: Weight check-in (with history list) ────────────────────────────
 function WeightSection({
   patient, weightLogs, isAr, onSaved,
@@ -414,8 +452,11 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
     tag:                    string
     note_en:                string
     note_ar:                string
-    calories_estimate_low?: number
+    calories_estimate_low?:  number
     calories_estimate_high?: number
+    protein_g?:              number
+    carbs_g?:                number
+    fat_g?:                  number
   } | null>(null)
   const [preview,       setPreview]      = useState<string | null>(null)
   // Step 2A — meal type selector
@@ -571,6 +612,7 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
                   <span className="font-tajawal">سعرة حرارية تقريبية</span>
                 </p>
               )}
+              <MacroPills protein_g={result.protein_g} carbs_g={result.carbs_g} fat_g={result.fat_g} />
             </div>
           </div>
           <button type="button"
@@ -627,6 +669,7 @@ function LastMealSection({ lastMeal, isAr }: { lastMeal: FoodLog; isAr: boolean 
           ~{lastMeal.calories_estimate_low}–{lastMeal.calories_estimate_high} kcal
         </p>
       )}
+      <MacroPills protein_g={lastMeal.protein_g} carbs_g={lastMeal.carbs_g} fat_g={lastMeal.fat_g} />
 
       {lastMeal.tag && (
         <span
@@ -720,6 +763,89 @@ function ContextSection({
   )
 }
 
+// ── Daily Calorie Ring ────────────────────────────────────────────────────────
+const CALORIE_GOAL = 1800
+const RING_R       = 19
+const RING_CIRC    = 2 * Math.PI * RING_R
+
+function CalorieRingCard({
+  low, high, mealCount,
+}: {
+  low:       number
+  high:      number
+  mealCount: number
+}) {
+  const avg    = (low + high) / 2
+  const pct    = Math.min(100, Math.round((avg / CALORIE_GOAL) * 100))
+  const offset = RING_CIRC * (1 - pct / 100)
+
+  return (
+    <div
+      style={{
+        background:   '#fff',
+        borderRadius: 16,
+        padding:      20,
+        boxShadow:    '0 1px 4px rgba(0,0,0,0.06)',
+      }}
+    >
+      <p
+        className="font-dm-sans uppercase"
+        style={{ fontSize: 12, color: '#999', letterSpacing: '0.08em', marginBottom: 12 }}
+      >
+        {"Today's Calories"}
+      </p>
+
+      {mealCount === 0 ? (
+        <p className="font-dm-sans" style={{ fontSize: 14, color: '#BBB' }}>
+          No meals logged yet
+        </p>
+      ) : (
+        <div className="flex items-center gap-4">
+          <svg width={48} height={48} viewBox="0 0 48 48">
+            <circle
+              cx={24} cy={24} r={RING_R}
+              fill="none" stroke="#E8F5F0" strokeWidth={5}
+            />
+            <circle
+              cx={24} cy={24} r={RING_R}
+              fill="none"
+              stroke="#1D9E75"
+              strokeWidth={5}
+              strokeDasharray={RING_CIRC}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              transform="rotate(-90 24 24)"
+            />
+            <text
+              x={24} y={24}
+              textAnchor="middle"
+              dominantBaseline="central"
+              style={{ fontSize: 10, fill: '#0D5C45', fontWeight: 600 }}
+            >
+              {pct}%
+            </text>
+          </svg>
+
+          <div>
+            <p
+              className="font-dm-sans font-bold"
+              style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1.1 }}
+            >
+              ~{low}–{high} kcal
+            </p>
+            <p
+              className="font-dm-sans"
+              style={{ fontSize: 12, color: '#999', marginTop: 4 }}
+            >
+              from {mealCount} meal photo{mealCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PatientHomePage() {
   const router = useRouter()
@@ -731,6 +857,7 @@ export default function PatientHomePage() {
   const [lastMeal,     setLastMeal]     = useState<FoodLog | null>(null)   // Feature 1
   const [streak,       setStreak]       = useState(0)                       // Feature 3
   const [dailyTip,     setDailyTip]     = useState<DailyTip | null>(null)  // Daily tip
+  const [todayCalories, setTodayCalories] = useState<{ low: number; high: number; mealCount: number } | null>(null)
   const [loading,      setLoading]      = useState(true)
 
   const isAr          = patient?.preferred_language === 'ar'
@@ -783,9 +910,10 @@ export default function PatientHomePage() {
         { data: wDates },
         { data: fDates },
         { data: cDates },
+        { data: todayFoodData },
       ] = await Promise.all([
         db.from('food_logs')
-          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, meal_type, logged_at')
+          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, protein_g, carbs_g, fat_g, meal_type, logged_at')
           .eq('patient_id', pat.id)
           .order('logged_at', { ascending: false })
           .limit(1),
@@ -801,6 +929,10 @@ export default function PatientHomePage() {
           .select('logged_at')
           .eq('patient_id', pat.id)
           .gte('logged_at', streakISO),
+        db.from('food_logs')
+          .select('calories_estimate_low, calories_estimate_high')
+          .eq('patient_id', pat.id)
+          .gte('logged_at', startOfDay().toISOString()),
       ])
 
       if (lastMealData?.[0]) setLastMeal(lastMealData[0] as FoodLog)
@@ -811,6 +943,12 @@ export default function PatientHomePage() {
         ...(cDates ?? []),
       ].map(l => l.logged_at)
       setStreak(calcStreak(allDates))
+
+      if (todayFoodData && todayFoodData.length > 0) {
+        const low  = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_low  ?? 0), 0)
+        const high = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_high ?? 0), 0)
+        setTodayCalories({ low, high, mealCount: todayFoodData.length })
+      }
 
       // Fetch daily tip (fire-and-forget — page renders without blocking)
       const today = new Date().toISOString().slice(0, 10)
@@ -866,6 +1004,13 @@ export default function PatientHomePage() {
 
       {/* Water Tracker — after weight, before food */}
       <WaterCard patientId={patient.id} />
+
+      {/* Daily Calorie Running Total */}
+      <CalorieRingCard
+        low={todayCalories?.low ?? 0}
+        high={todayCalories?.high ?? 0}
+        mealCount={todayCalories?.mealCount ?? 0}
+      />
 
       <FoodSection patient={patient} isAr={isAr} />
 

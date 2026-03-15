@@ -271,7 +271,7 @@ export default function LoginPage() {
                 marginBottom: 40,
               }}
             >
-              Sign in to your dashboard
+              Enter your email and password to continue
             </p>
 
             {/* Auth logic — untouched */}

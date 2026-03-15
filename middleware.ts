@@ -8,7 +8,6 @@ export async function middleware(request: NextRequest) {
   // ── 1. ALWAYS allow these paths through, no checks ──
   const publicPaths = [
     '/login',
-    '/patient/login',
     '/patient/signup',
     '/join',
     '/api/',
@@ -42,16 +41,9 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // ── 3. Not logged in — send to appropriate login ──
+  // ── 3. Not logged in — send to /login ──
   if (!user) {
-    if (pathname.startsWith('/patient')) {
-      return NextResponse.redirect(
-        new URL('/patient/login', request.url)
-      )
-    }
-    return NextResponse.redirect(
-      new URL('/login', request.url)
-    )
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // ── 4. Logged in — check role for routing ──

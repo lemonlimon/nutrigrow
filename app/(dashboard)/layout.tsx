@@ -1,4 +1,5 @@
 import { DashboardNavPills } from './DashboardNavPills'
+import { SignOutButton }     from './SignOutButton'
 
 // ── Layout — mobile-first, no sidebar ────────────────────────────────────────
 export default function DashboardLayout({
@@ -32,9 +33,12 @@ export default function DashboardLayout({
           <span className="font-tajawal" style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1 }}>
             ميزان
           </span>
-          <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
-            MIZAN
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
+              MIZAN
+            </span>
+            <SignOutButton />
+          </div>
         </div>
 
         {/* Nav pills */}

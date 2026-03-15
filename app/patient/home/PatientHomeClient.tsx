@@ -1595,8 +1595,6 @@ export default function PatientHomeClient({
   adminPatientId?:   string | null
   adminPatientName?: string | null
 } = {}) {
-  const router = useRouter()
-
   const [patient,      setPatient]      = useState<Patient | null>(null)
   const [weightLogs,   setWeightLogs]   = useState<WeightLog[]>([])
   const [contextLogs,  setContextLogs]  = useState<ContextLog[]>([])
@@ -1616,6 +1614,7 @@ export default function PatientHomeClient({
   const [loading,      setLoading]      = useState(true)
   const [greeting,     setGreeting]     = useState('Good to see you')
   const [loggedDates,  setLoggedDates]  = useState<Set<string>>(new Set())
+  const [showMenu,     setShowMenu]     = useState(false)
 
   // Scroll-anchor refs for hero dashboard cards
   const weightRef          = useRef<HTMLDivElement>(null)
@@ -1625,6 +1624,11 @@ export default function PatientHomeClient({
   const scrollTo  = useCallback((ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
+
+  const handleSignOut = async () => {
+    await supabase().auth.signOut()
+    window.location.href = '/login'
+  }
 
   // Time-based greeting (client-side only — avoids server/client hydration mismatch)
   useEffect(() => {
@@ -1644,7 +1648,7 @@ export default function PatientHomeClient({
       const db = supabase()
 
       const { data: { user }, error: authErr } = await db.auth.getUser()
-      if (authErr || !user) { router.replace('/patient/login'); return }
+      if (authErr || !user) { window.location.href = '/login'; return }
 
       // Admin impersonation: if adminPatientId is provided (set by server wrapper
       // after verifying the admin cookie), load that patient directly.
@@ -1660,7 +1664,7 @@ export default function PatientHomeClient({
             .single()
 
       const { data: pat, error: patErr } = await patQuery
-      if (patErr || !pat) { router.replace('/patient/login'); return }
+      if (patErr || !pat) { window.location.href = '/login'; return }
       setPatient(pat as Patient)
 
       // Existing queries
@@ -1822,6 +1826,75 @@ export default function PatientHomeClient({
       <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
         MIZAN
       </span>
+
+      {/* Avatar + sign-out dropdown */}
+      {patient && (
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setShowMenu(m => !m)}
+            style={{
+              width:          32,
+              height:         32,
+              borderRadius:   '50%',
+              background:     '#E8F5F0',
+              color:          '#0D5C45',
+              fontSize:       14,
+              fontWeight:     700,
+              border:         'none',
+              cursor:         'pointer',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              fontFamily:     'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+            }}
+          >
+            {patient.first_name[0]?.toUpperCase()}
+          </button>
+
+          {showMenu && (
+            <>
+              {/* Click-away backdrop */}
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                onClick={() => setShowMenu(false)}
+              />
+              <div
+                style={{
+                  position:     'absolute',
+                  top:          'calc(100% + 8px)',
+                  right:        0,
+                  background:   'white',
+                  borderRadius: 12,
+                  boxShadow:    '0 4px 20px rgba(0,0,0,0.12)',
+                  padding:      '8px 0',
+                  zIndex:       100,
+                  minWidth:     160,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  style={{
+                    display:    'block',
+                    width:      '100%',
+                    padding:    '12px 16px',
+                    textAlign:  'left',
+                    background: 'none',
+                    border:     'none',
+                    fontSize:   14,
+                    color:      '#E8623A',
+                    fontFamily: 'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
+                    cursor:     'pointer',
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
 
     {/* ── Calendar Date Strip — full-width, sticky below header ── */}

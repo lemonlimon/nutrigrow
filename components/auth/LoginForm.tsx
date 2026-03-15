@@ -1,8 +1,6 @@
 'use client'
 
-// AUTH LOGIC — do not modify
 import { useState }     from 'react'
-import { useRouter }    from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginForm() {
@@ -10,7 +8,6 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
-  const router                  = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,7 +15,7 @@ export default function LoginForm() {
     setError(null)
 
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -29,7 +26,25 @@ export default function LoginForm() {
       return
     }
 
-    router.push('/dashboard')
+    // Role-based routing — window.location.href for a hard navigation
+    // so session cookies are fully committed before the next page loads
+    const userId = authData.user?.id
+    if (userId) {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+
+      const isAdmin  = roles?.some(r => r.role === 'admin')
+      const isClinic = roles?.some(r => r.role === 'clinic')
+
+      if (isAdmin || isClinic) {
+        window.location.href = '/dashboard'
+        return
+      }
+    }
+
+    window.location.href = '/patient/home'
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────
@@ -73,7 +88,7 @@ export default function LoginForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="doctor@hospital.com"
+          placeholder="you@example.com"
           style={inputStyle}
           onFocus={(e)  => { e.currentTarget.style.borderColor = '#0D5C45' }}
           onBlur={(e)   => { e.currentTarget.style.borderColor = '#e8e8e8' }}
@@ -138,27 +153,6 @@ export default function LoginForm() {
         </p>
       )}
 
-      {/* Divider */}
-      <div style={{ marginTop: 32, borderTop: '1px solid #f0f0f0' }} />
-
-      {/* Footer */}
-      <p
-        style={{
-          marginTop:  16,
-          fontFamily: 'var(--font-dm-sans), DM Sans, system-ui, sans-serif',
-          fontSize:   13,
-          color:      '#999',
-          textAlign:  'center',
-        }}
-      >
-        New to MIZAN?{' '}
-        <span
-          style={{ color: '#0D5C45', cursor: 'pointer' }}
-          onClick={() => router.push('/enroll')}
-        >
-          Register your clinic
-        </span>
-      </p>
 
     </form>
   )

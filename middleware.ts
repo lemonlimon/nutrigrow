@@ -5,13 +5,13 @@ import type { NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // ── 1. ALWAYS allow these paths through, no checks ──
-  const publicPaths = [
-    '/login',
+  // ── 1. Static / infrastructure paths — never need auth ──────────────────────
+  // These are allowed through unconditionally (no session read).
+  const alwaysPublic = [
     '/patient/signup',
     '/join',
-    '/onboarding',     // onboarding flow (both unauthenticated and authenticated)
-    '/auth/callback',  // OAuth / magic-link callback
+    '/onboarding',     // onboarding flow (unauthenticated and authenticated)
+    '/auth/callback',  // OAuth / magic-link code exchange
     '/api/',
     '/_next/',
     '/favicon',
@@ -19,16 +19,13 @@ export async function middleware(request: NextRequest) {
     '/icons',
     '/robots',
   ]
-
-  if (publicPaths.some(p => pathname.startsWith(p))) {
+  if (alwaysPublic.some(p => pathname.startsWith(p))) {
     return NextResponse.next()
   }
 
-  // ── 2. Create Supabase client with PROPER cookie threading ──
-  // Per @supabase/ssr docs: setAll must update BOTH request cookies
-  // AND the response cookies so the refreshed session is persisted.
-  // An empty setAll means every getUser() call "refreshes" in memory
-  // but never commits — so middleware sees null user on every request.
+  // ── 2. Build Supabase client with correct cookie threading ──────────────────
+  // Per @supabase/ssr docs: setAll must update BOTH the request cookies AND
+  // the response cookies so that a refreshed session token is persisted.
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -40,11 +37,9 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // Step 1: apply to the request so subsequent getAll() calls see them
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          // Step 2: create new response that carries the updated cookies
           response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -54,83 +49,76 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Use getSession() instead of getUser() in middleware.
-  // getUser() makes a live network call to Supabase which can silently
-  // fail in Next.js Edge Runtime. getSession() decodes the JWT from the
-  // cookie directly — no network call, works reliably in Edge Runtime.
-  // Routing decisions here are safe; all data access is still
-  // protected by Supabase RLS policies.
+  // Use getSession() — decodes the JWT from the cookie locally with NO network
+  // call. Safe for Edge Runtime. All actual data access is protected by RLS.
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user ?? null
 
-  // ── 3. Not logged in — send to /login ──
+  // ── 3. /login — special handling ────────────────────────────────────────────
+  // Unauthenticated users see the login page normally.
+  // Authenticated users are redirected to the right home screen so they don't
+  // land on the login form after already being signed in.
+  if (pathname.startsWith('/login')) {
+    if (!user) return NextResponse.next()
+
+    // Already authenticated — redirect based on role.
+    // One DB call here is acceptable: /login is not a hot path.
+    try {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+
+      const isPrivileged = (roles ?? []).some(
+        r => r.role === 'admin' || r.role === 'clinic'
+      )
+      return NextResponse.redirect(
+        new URL(isPrivileged ? '/dashboard' : '/patient/home', request.url)
+      )
+    } catch {
+      // DB error — safest fallback is patient home (never /login which would loop)
+      return NextResponse.redirect(new URL('/patient/home', request.url))
+    }
+  }
+
+  // ── 4. All other routes require authentication ────────────────────────────
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // ── 4. Logged in — role-based routing ──
-  // Wrapped in try/catch: a DB error must NEVER lock users out.
-  try {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role, clinic_id')
-      .eq('user_id', user.id)
-
-    const isAdmin   = roles?.some(r => r.role === 'admin')
-    const isClinic  = roles?.some(r => r.role === 'clinic')
-    const isPatient = roles?.some(r => r.role === 'patient')
-
-    // Admin goes anywhere — never redirect admin
-    if (isAdmin) {
-      return response
-    }
-
-    // Clinic staff trying to access patient routes
-    if (isClinic && pathname.startsWith('/patient')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-
-    // Patient trying to access clinic/admin routes
-    if (isPatient && (
-      pathname.startsWith('/dashboard') ||
-      pathname.startsWith('/patients') ||
-      pathname.startsWith('/admin')
-    )) {
-      return NextResponse.redirect(new URL('/patient/home', request.url))
-    }
-
-    // No role in user_roles — check patients table
-    // (patients enrolled before user_roles existed)
-    if (!isAdmin && !isClinic && !isPatient) {
-      if (
-        pathname.startsWith('/dashboard') ||
-        pathname.startsWith('/patients') ||
-        pathname.startsWith('/admin')
-      ) {
-        const { data: patientRecord } = await supabase
-          .from('patients')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-
-        if (patientRecord) {
-          return NextResponse.redirect(new URL('/patient/home', request.url))
-        }
-
-        // Unknown role and no patient record — let them through rather than
-        // creating a redirect loop. The page itself will handle auth errors.
-        return response
-      }
-    }
-  } catch (err) {
-    // If ANY error in role check, let them through — errors must never
-    // lock users out.
-    console.error('[Middleware] Role check error:', err)
+  // ── 5. /patient/* — any authenticated user may access ─────────────────────
+  // No role check needed; the page itself enforces what each user can see.
+  // This is the critical rule: never block an authenticated user from
+  // /patient/home regardless of what role they have in user_roles.
+  if (pathname.startsWith('/patient/')) {
     return response
   }
 
-  // Return the response object so any session cookies set by setAll
-  // are actually sent back to the browser.
+  // ── 6. Privileged routes — require admin or clinic role ───────────────────
+  // Only run the DB query for paths that actually need role enforcement.
+  const privilegedPaths = ['/dashboard', '/patients', '/admin']
+  if (privilegedPaths.some(p => pathname.startsWith(p))) {
+    try {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+
+      const isAdmin  = (roles ?? []).some(r => r.role === 'admin')
+      const isClinic = (roles ?? []).some(r => r.role === 'clinic')
+
+      if (!isAdmin && !isClinic) {
+        // Authenticated but not privileged — send to patient home
+        return NextResponse.redirect(new URL('/patient/home', request.url))
+      }
+    } catch (err) {
+      // DB error — redirect rather than letting unknown users into admin pages
+      console.error('[Middleware] Role check error:', err)
+      return NextResponse.redirect(new URL('/patient/home', request.url))
+    }
+  }
+
+  // ── 7. Authenticated, no special rule matched — pass through ──────────────
   return response
 }
 

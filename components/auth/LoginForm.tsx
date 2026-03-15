@@ -1,9 +1,12 @@
 'use client'
 
-import { useState }     from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState }        from 'react'
+import { useRouter }        from 'next/navigation'
+import { createClient }     from '@/lib/supabase/client'
 
 export default function LoginForm() {
+  const router = useRouter()
+
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading]   = useState(false)
@@ -27,12 +30,9 @@ export default function LoginForm() {
       return
     }
 
-    // Role-based routing — window.location.href for a hard navigation
-    // so session cookies are fully committed before the next page loads.
+    // Determine destination before navigating.
     // Rule: admin or clinic → /dashboard; everyone else → /patient/home.
-    // We intentionally avoid querying the patients table here because RLS
-    // can block the read (e.g. user_id NULL for legacy enrolled patients),
-    // and the old fallback to /dashboard caused a redirect loop for patients.
+    let destination = '/patient/home'
     const userId = authData.user?.id
     if (userId) {
       const { data: rolesData } = await supabase
@@ -43,15 +43,15 @@ export default function LoginForm() {
       const roles    = rolesData ?? []
       const isAdmin  = roles.some(r => r.role === 'admin')
       const isClinic = roles.some(r => r.role === 'clinic')
-
-      if (isAdmin || isClinic) {
-        window.location.href = '/dashboard'
-        return
-      }
+      if (isAdmin || isClinic) destination = '/dashboard'
     }
 
-    // Default: patients, unassigned users, and any role not handled above
-    window.location.href = '/patient/home'
+    // router.refresh() tells Next.js to re-run server components so that the
+    // session cookie set by signInWithPassword is visible to middleware before
+    // we navigate. Without this, the hard navigation races the cookie write and
+    // middleware can see session = null, bouncing the user back to /login.
+    router.refresh()
+    router.push(destination)
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────

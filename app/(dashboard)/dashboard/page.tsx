@@ -1,92 +1,378 @@
-// CHANGE 1: heading → #1a1a1a, stat numbers → #1a1a1a, labels → #666
+import Link                  from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const CLINIC_ID = '00000000-0000-0000-0000-000000000001'
 
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+function IconPerson() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+      stroke="#0D5C45" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="7" r="4" />
+      <path d="M4 20c0-4 3.582-6 8-6s8 2 8 6" />
+    </svg>
+  )
+}
+
+function IconCamera() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+      stroke="#0D5C45" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  )
+}
+
+function IconStar() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+      stroke="#0D5C45" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+  )
+}
+
+function IconScale() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+      stroke="#0D5C45" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18"/>
+      <path d="M5 8l7-5 7 5"/>
+      <path d="M3 12h6M15 12h6"/>
+      <path d="M3 12a3 3 0 006 0"/>
+      <path d="M15 12a3 3 0 006 0"/>
+    </svg>
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getActivityTier(lastLoggedAt: string | undefined): 0 | 1 | 2 | 3 {
+  if (!lastLoggedAt) return 3
+  const diffMs   = Date.now() - new Date(lastLoggedAt).getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays < 1)  return 0  // green  — today
+  if (diffDays <= 3) return 1  // amber  — 1–3 days
+  if (diffDays <= 6) return 2  // orange — 4–6 days
+  return 3                     // grey   — 7+ or never
+}
+
+const DOT_COLOR = ['#1D9E75', '#F5A623', '#E8623A', '#CCC'] as const
+
+function fmtLastLogged(lastLoggedAt: string | undefined): string {
+  if (!lastLoggedAt) return 'Never logged'
+  const diffMs   = Date.now() - new Date(lastLoggedAt).getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays < 1)  return 'Logged today'
+  if (diffDays === 1) return '1 day ago'
+  return `${diffDays} days ago`
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
   const admin = createAdminClient()
 
-  const { count: totalPatients } = await admin
+  // UTC midnight for "logged today"
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+
+  const sevenDaysBack = new Date()
+  sevenDaysBack.setDate(sevenDaysBack.getDate() - 7)
+
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  })
+
+  // Step 1: fetch patients first (need IDs for sub-queries)
+  const { data: patients } = await admin
     .from('patients')
-    .select('*', { count: 'exact', head: true })
+    .select('id, first_name, bmi, enrolled_at')
     .eq('clinic_id', CLINIC_ID)
+    .order('enrolled_at', { ascending: false })
 
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
+  type PatientRow = { id: string; first_name: string; bmi: number | null; enrolled_at: string }
+  const rows        = (patients ?? []) as PatientRow[]
+  const totalPatients = rows.length
+  const patientIds    = rows.map(p => p.id)
 
-  const { count: enrolledThisMonth } = await admin
-    .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .eq('clinic_id', CLINIC_ID)
-    .gte('enrolled_at', startOfMonth.toISOString())
+  // Step 2: parallel stat + activity queries
+  let loggedToday   = 0
+  let avgMealScore: number | null = null
+  let weekWeighIns  = 0
+  let lastFoodMap:   Record<string, { logged_at: string; meal_score: number | null }> = {}
+  let lastWeightMap: Record<string, string> = {}
 
-  const stats = [
-    { label: 'Total Patients',      value: String(totalPatients    ?? 0) },
-    { label: 'Enrolled This Month', value: String(enrolledThisMonth ?? 0) },
-  ]
+  if (patientIds.length > 0) {
+    const [
+      { data: todayFoodLogs },
+      { data: weekFoodScores },
+      { count: weekWeighInCount },
+      { data: allFoodLogs },
+      { data: allWeightLogs },
+    ] = await Promise.all([
+      // patients who logged anything today
+      admin.from('food_logs')
+        .select('patient_id')
+        .in('patient_id', patientIds)
+        .gte('logged_at', todayStart.toISOString()),
 
+      // meal scores this week (for avg)
+      admin.from('food_logs')
+        .select('meal_score')
+        .in('patient_id', patientIds)
+        .gte('logged_at', sevenDaysBack.toISOString())
+        .not('meal_score', 'is', null),
+
+      // weigh-ins this week (count only)
+      admin.from('weight_logs')
+        .select('*', { count: 'exact', head: true })
+        .in('patient_id', patientIds)
+        .gte('logged_at', sevenDaysBack.toISOString()),
+
+      // last food log per patient (for activity dot + last-logged text)
+      admin.from('food_logs')
+        .select('patient_id, logged_at, meal_score')
+        .in('patient_id', patientIds)
+        .order('logged_at', { ascending: false })
+        .limit(500),
+
+      // last weight log per patient
+      admin.from('weight_logs')
+        .select('patient_id, logged_at')
+        .in('patient_id', patientIds)
+        .order('logged_at', { ascending: false })
+        .limit(500),
+    ])
+
+    // Logged today: distinct patients
+    const loggedSet = new Set(
+      (todayFoodLogs ?? []).map((l: { patient_id: string }) => l.patient_id)
+    )
+    loggedToday = loggedSet.size
+
+    // Avg meal score
+    const scores = (weekFoodScores ?? []).map((l: { meal_score: number | null }) => l.meal_score as number)
+    if (scores.length > 0) {
+      avgMealScore = scores.reduce((a, b) => a + b, 0) / scores.length
+    }
+
+    weekWeighIns = weekWeighInCount ?? 0
+
+    // Last food per patient (first occurrence in ordered list = most recent)
+    for (const log of (allFoodLogs ?? [])) {
+      const l = log as { patient_id: string; logged_at: string; meal_score: number | null }
+      if (!lastFoodMap[l.patient_id]) {
+        lastFoodMap = { ...lastFoodMap, [l.patient_id]: { logged_at: l.logged_at, meal_score: l.meal_score } }
+      }
+    }
+
+    // Last weight per patient
+    for (const log of (allWeightLogs ?? [])) {
+      const l = log as { patient_id: string; logged_at: string }
+      if (!lastWeightMap[l.patient_id]) {
+        lastWeightMap = { ...lastWeightMap, [l.patient_id]: l.logged_at }
+      }
+    }
+  }
+
+  // ── Derived colors ────────────────────────────────────────────────────────
+  const loggedPct   = totalPatients > 0 ? loggedToday / totalPatients : 0
+  const loggedColor = loggedPct > 0.5 ? '#1D9E75' : loggedPct >= 0.25 ? '#F5A623' : '#E8623A'
+  const scoreColor  = avgMealScore === null
+    ? '#CCC'
+    : avgMealScore >= 7 ? '#1D9E75'
+    : avgMealScore >= 4 ? '#F5A623'
+    : '#E8623A'
+
+  // ── Sort: green → amber → orange → grey ───────────────────────────────────
+  const sortedRows = [...rows].sort((a, b) =>
+    getActivityTier(lastFoodMap[a.id]?.logged_at) -
+    getActivityTier(lastFoodMap[b.id]?.logged_at)
+  )
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl">
-
-      {/* Heading — CHANGE 1: near-black */}
-      <h2
-        className="font-playfair font-bold mb-8"
-        style={{ fontSize: 28, color: '#1a1a1a' }}
-      >
-        Dashboard
-      </h2>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-10">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="bg-white rounded-card shadow-sm border border-gray-100 px-6 py-7"
-          >
-            <p
-              className="font-dm-sans uppercase mb-2"
-              style={{ fontSize: 11, color: '#888', letterSpacing: '0.06em' }}
-            >
-              {s.label}
-            </p>
-            {/* CHANGE 1: stat number in near-black not green */}
-            <p
-              className="font-playfair font-bold"
-              style={{ fontSize: 48, color: '#1a1a1a', lineHeight: 1 }}
-            >
-              {s.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick actions */}
-      <div className="bg-white rounded-card shadow-sm border border-gray-100 p-6">
-        <h3
-          className="font-dm-sans font-semibold mb-4 uppercase"
-          style={{ fontSize: 11, color: '#888', letterSpacing: '0.06em' }}
-        >
-          Quick Actions
-        </h3>
-        <div className="flex gap-3 flex-wrap">
-          <a
-            href="/patients"
-            className="bg-brand-dark text-white px-5 py-2.5 rounded-btn
-                       text-sm font-dm-sans font-medium hover:opacity-90 transition"
-          >
-            View Patients
-          </a>
-          <a
-            href="/enroll"
-            className="border border-brand-dark text-brand-dark bg-transparent
-                       px-5 py-2.5 rounded-btn text-sm font-dm-sans font-medium
-                       hover:bg-brand-light transition"
-          >
-            + Enroll New Patient
-          </a>
-        </div>
-      </div>
+    <>
+    {/* ── Sticky app header ── */}
+    <div
+      className="-mx-4 -mt-6 md:-mx-8 md:-mt-8"
+      style={{
+        position:       'sticky',
+        top:            0,
+        zIndex:         50,
+        height:         52,
+        background:     '#FAFAF8',
+        borderBottom:   '1px solid #F0F0F0',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        padding:        '0 20px',
+      }}
+    >
+      <span className="font-tajawal" style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1 }}>
+        ميزان
+      </span>
+      <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
+        MIZAN
+      </span>
     </div>
+
+    {/* ── Today's date ── */}
+    <p
+      className="font-dm-sans"
+      style={{ fontSize: 13, color: '#999', textAlign: 'center', margin: '16px 0 20px' }}
+    >
+      {todayStr}
+    </p>
+
+    {/* ── Hero stats 2×2 ── */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
+
+      {/* Card 1 — Total Patients */}
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <IconPerson />
+        <p className="font-dm-sans" style={{ fontSize: 32, fontWeight: 700, color: '#1A1A1A', lineHeight: 1, marginTop: 8 }}>
+          {totalPatients}
+        </p>
+        <p className="font-dm-sans uppercase" style={{ fontSize: 11, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}>
+          TOTAL PATIENTS
+        </p>
+      </div>
+
+      {/* Card 2 — Logged Today */}
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <IconCamera />
+        <p className="font-dm-sans" style={{ fontSize: 32, fontWeight: 700, color: loggedColor, lineHeight: 1, marginTop: 8 }}>
+          {loggedToday}
+        </p>
+        <p className="font-dm-sans" style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+          of {totalPatients} patients
+        </p>
+        <p className="font-dm-sans uppercase" style={{ fontSize: 11, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}>
+          LOGGED TODAY
+        </p>
+      </div>
+
+      {/* Card 3 — Avg Meal Score */}
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <IconStar />
+        <p className="font-dm-sans" style={{ fontSize: 32, fontWeight: 700, color: scoreColor, lineHeight: 1, marginTop: 8 }}>
+          {avgMealScore !== null ? avgMealScore.toFixed(1) : '—'}
+        </p>
+        <p className="font-dm-sans uppercase" style={{ fontSize: 11, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}>
+          AVG MEAL SCORE
+        </p>
+      </div>
+
+      {/* Card 4 — Weigh-ins */}
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <IconScale />
+        <p className="font-dm-sans" style={{ fontSize: 32, fontWeight: 700, color: '#1A1A1A', lineHeight: 1, marginTop: 8 }}>
+          {weekWeighIns}
+        </p>
+        <p className="font-dm-sans uppercase" style={{ fontSize: 11, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}>
+          WEIGH-INS
+        </p>
+      </div>
+
+    </div>
+
+    {/* ── Patient list ── */}
+    <div style={{ marginBottom: 32 }}>
+
+      {/* Title row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span className="font-playfair" style={{ fontSize: 20, color: '#1A1A1A' }}>
+          Patients
+        </span>
+        <span
+          className="font-dm-sans"
+          style={{
+            background: '#E8F5F0', color: '#0D5C45',
+            padding: '2px 10px', borderRadius: 20,
+            fontSize: 12, fontWeight: 700,
+          }}
+        >
+          {totalPatients}
+        </span>
+        <a
+          href="/enroll"
+          className="font-dm-sans"
+          style={{
+            marginLeft: 'auto', background: '#0D5C45', color: '#fff',
+            padding: '6px 14px', borderRadius: 8,
+            fontSize: 12, fontWeight: 600, textDecoration: 'none',
+          }}
+        >
+          + Enroll
+        </a>
+      </div>
+
+      {/* Empty state */}
+      {sortedRows.length === 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: 40, textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: 32, marginBottom: 8 }}>🌿</p>
+          <p className="font-dm-sans" style={{ color: '#999', fontSize: 14 }}>No patients enrolled yet</p>
+        </div>
+      )}
+
+      {/* Patient rows */}
+      {sortedRows.map((p) => {
+        const lastFood   = lastFoodMap[p.id]
+        const tier       = getActivityTier(lastFood?.logged_at)
+        const dotColor   = DOT_COLOR[tier]
+        const lastLogTxt = fmtLastLogged(lastFood?.logged_at)
+
+        return (
+          <Link
+            key={p.id}
+            href={`/patients/${p.id}`}
+            style={{
+              display:        'flex',
+              alignItems:     'center',
+              gap:            12,
+              background:     '#fff',
+              borderRadius:   12,
+              padding:        '16px 16px',
+              marginBottom:   8,
+              boxShadow:      '0 1px 3px rgba(0,0,0,0.05)',
+              textDecoration: 'none',
+            }}
+          >
+            {/* Activity dot */}
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+
+            {/* Name + last logged */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="font-dm-sans" style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
+                {p.first_name}
+              </p>
+              <p className="font-dm-sans" style={{ fontSize: 13, color: '#999', margin: '2px 0 0' }}>
+                {lastLogTxt}
+              </p>
+            </div>
+
+            {/* BMI pill + chevron */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {p.bmi !== null && (
+                <span
+                  className="font-dm-sans"
+                  style={{
+                    background: '#F5F5F5', color: '#666',
+                    fontSize: 12, borderRadius: 20,
+                    padding: '3px 10px',
+                  }}
+                >
+                  BMI {p.bmi}
+                </span>
+              )}
+              <span style={{ fontSize: 18, color: '#CCC', lineHeight: 1 }}>›</span>
+            </div>
+          </Link>
+        )
+      })}
+
+    </div>
+    </>
   )
 }

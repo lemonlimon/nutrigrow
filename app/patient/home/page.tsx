@@ -1233,13 +1233,14 @@ const RING_R       = 19
 const RING_CIRC    = 2 * Math.PI * RING_R
 
 function CalorieRingCard({
-  low, mealCount, proteinG, carbsG, fatG,
+  low, mealCount, proteinG, carbsG, fatG, onTap,
 }: {
   low:       number
   mealCount: number
   proteinG:  number
   carbsG:    number
   fatG:      number
+  onTap?:    () => void
 }) {
   // Use calories_estimate_low as the "consumed" figure (conservative estimate)
   const consumed    = low
@@ -1258,11 +1259,13 @@ function CalorieRingCard({
 
   return (
     <div
+      onClick={mealCount === 0 ? onTap : undefined}
       style={{
         background:   '#fff',
         borderRadius: 16,
         padding:      20,
         boxShadow:    '0 1px 4px rgba(0,0,0,0.06)',
+        cursor:       mealCount === 0 ? 'pointer' : undefined,
       }}
     >
       <p
@@ -1273,9 +1276,19 @@ function CalorieRingCard({
       </p>
 
       {mealCount === 0 ? (
-        <p className="font-dm-sans" style={{ fontSize: 14, color: '#BBB' }}>
-          No meals logged yet
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4, paddingBottom: 4 }}>
+          <svg width={88} height={88} viewBox="0 0 88 88">
+            <circle
+              cx={44} cy={44} r={34}
+              fill="none" stroke="#E0E0E0" strokeWidth={7}
+              strokeDasharray="6 4"
+            />
+            <text x={44} y={44} textAnchor="middle" dominantBaseline="central" fontSize="24">🍽️</text>
+          </svg>
+          <p className="font-dm-sans" style={{ fontSize: 13, color: '#CCC', margin: 0 }}>
+            0 / 1,800 kcal
+          </p>
+        </div>
       ) : (
         <>
           {/* Calories row */}
@@ -1371,30 +1384,37 @@ function CalorieRingCard({
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const
 
 function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
+  const todayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [])
+
   const today    = new Date()
   const todayStr = today.toDateString()
 
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - today.getDay())
-  weekStart.setHours(0, 0, 0, 0)
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart)
-    d.setDate(weekStart.getDate() + i)
+  // 28 days: 21 back + today (index 21) + 6 ahead
+  const days = Array.from({ length: 28 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(today.getDate() - 21 + i)
     return d
   })
 
   return (
     <div
+      className="mizan-cal-strip"
       style={{
         position:       'sticky',
         top:            52,
         zIndex:         40,
         background:     '#F2F2F7',
-        padding:        '10px 16px 14px',
+        padding:        '10px 8px 14px',
         display:        'flex',
-        justifyContent: 'space-around',
-      }}
+        overflowX:      'scroll',
+        scrollSnapType: 'x mandatory',
+        scrollbarWidth: 'none',
+        gap:            4,
+      } as React.CSSProperties}
     >
       {days.map((d, i) => {
         const dStr     = d.toDateString()
@@ -1425,13 +1445,21 @@ function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
         return (
           <div
             key={i}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40 }}
+            ref={isToday ? todayRef : undefined}
+            style={{
+              display:         'flex',
+              flexDirection:   'column',
+              alignItems:      'center',
+              minWidth:        44,
+              scrollSnapAlign: 'center',
+              flexShrink:      0,
+            } as React.CSSProperties}
           >
             <span
               className="font-dm-sans"
               style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', marginBottom: 6, lineHeight: 1 }}
             >
-              {DAY_LETTERS[i]}
+              {DAY_LETTERS[d.getDay()]}
             </span>
 
             <div
@@ -1455,7 +1483,7 @@ function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
               </span>
             </div>
 
-            {/* Consistent dot row — keeps spacing uniform */}
+            {/* Consistent dot row */}
             <div
               style={{
                 width:        3,
@@ -1616,8 +1644,9 @@ export default function PatientHomePage() {
         setTodayCalories({ low, high, mealCount: todayFoodData.length, proteinG, carbsG, fatG })
       }
 
-      // Fetch today's water (fire-and-forget)
-      const today = new Date().toISOString().slice(0, 10)
+      // Fetch today's water (fire-and-forget) — use LOCAL date to avoid UTC-offset bug
+      const _now  = new Date()
+      const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
       fetch(`/api/water-log?patientId=${pat.id}&date=${today}`)
         .then(r => r.json())
         .then(json => { if (json.success) setWaterMl(json.data.glasses ?? 0) })
@@ -1629,20 +1658,20 @@ export default function PatientHomePage() {
         .then(json => { if (json.success) setDailyTip(json.data) })
         .catch(() => { /* fail silently — tip is non-critical */ })
 
-      // Fetch calendar strip: food_logs for current Sun–Sat week (fire-and-forget)
-      const weekStartCal = new Date()
-      weekStartCal.setDate(weekStartCal.getDate() - weekStartCal.getDay())
-      weekStartCal.setHours(0, 0, 0, 0)
-      const weekEndCal = new Date(weekStartCal)
-      weekEndCal.setDate(weekEndCal.getDate() + 7)
+      // Fetch calendar strip: 28 days (21 back + today + 6 ahead) (fire-and-forget)
+      const calStart = new Date()
+      calStart.setDate(calStart.getDate() - 21)
+      calStart.setHours(0, 0, 0, 0)
+      const calEnd = new Date()
+      calEnd.setDate(calEnd.getDate() + 7)
       db.from('food_logs')
         .select('logged_at')
         .eq('patient_id', pat.id)
-        .gte('logged_at', weekStartCal.toISOString())
-        .lt('logged_at', weekEndCal.toISOString())
-        .then(({ data: weekLogs }) => {
+        .gte('logged_at', calStart.toISOString())
+        .lt('logged_at', calEnd.toISOString())
+        .then(({ data: calLogs }) => {
           setLoggedDates(new Set(
-            weekLogs?.map(l => new Date(l.logged_at).toDateString()) ?? []
+            calLogs?.map(l => new Date(l.logged_at).toDateString()) ?? []
           ))
         })
 
@@ -1747,7 +1776,16 @@ export default function PatientHomePage() {
           proteinG={todayCalories?.proteinG   ?? 0}
           carbsG={todayCalories?.carbsG       ?? 0}
           fatG={todayCalories?.fatG           ?? 0}
+          onTap={() => scrollTo(foodRef)}
         />
+        {(todayCalories?.mealCount ?? 0) === 0 && (
+          <p
+            className="font-dm-sans"
+            style={{ fontSize: 12, color: '#BBB', textAlign: 'center', fontStyle: 'italic', marginTop: -8 }}
+          >
+            Tap 📸 to log your first meal today
+          </p>
+        )}
 
         <FoodSection
           patient={patient}
@@ -1795,38 +1833,44 @@ export default function PatientHomePage() {
     {/* ── Floating Camera FAB ── */}
     <style>{`
       @keyframes breathe {
-        0%, 100% { transform: scale(1); }
-        50%       { transform: scale(1.1); }
+        0%, 100% {
+          transform: scale(1);
+          box-shadow: 0 4px 16px rgba(232,98,58,0.4);
+        }
+        50% {
+          transform: scale(1.18);
+          box-shadow: 0 6px 28px rgba(232,98,58,0.7);
+        }
       }
       @keyframes twinkle {
-        0%, 100% { opacity: 0; transform: scale(0.5); }
-        50%       { opacity: 1; transform: scale(1); }
+        0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+        50%       { opacity: 1; transform: scale(1.2) rotate(180deg); }
       }
       .mizan-fab:hover, .mizan-fab:active { transform: scale(1.08) !important; }
+      .mizan-cal-strip::-webkit-scrollbar { display: none; }
     `}</style>
     <div style={{ position: 'fixed', bottom: 88, right: 20, zIndex: 100 }}>
-      {/* Sparkle stars — visible only when no meals logged today */}
       {(todayCalories?.mealCount ?? 0) === 0 && (
         <>
           <span style={{
             position: 'absolute', top: -6, right: -4,
-            fontSize: 8, color: '#F5A623', lineHeight: 1,
-            animation: 'twinkle 2s ease-in-out infinite',
+            fontSize: 10, color: '#F5A623', lineHeight: 1,
+            animation: 'twinkle 1.8s ease-in-out infinite',
             animationDelay: '0s',
             pointerEvents: 'none',
           }}>✦</span>
           <span style={{
-            position: 'absolute', top: -2, left: -8,
-            fontSize: 6, color: 'white', lineHeight: 1,
-            animation: 'twinkle 2s ease-in-out infinite',
-            animationDelay: '0.9s',
+            position: 'absolute', top: -4, left: -6,
+            fontSize: 9, color: '#FFFFFF', lineHeight: 1,
+            animation: 'twinkle 1.8s ease-in-out infinite',
+            animationDelay: '0.6s',
             pointerEvents: 'none',
           }}>✦</span>
           <span style={{
-            position: 'absolute', bottom: -6, right: -2,
-            fontSize: 7, color: '#1D9E75', lineHeight: 1,
-            animation: 'twinkle 2s ease-in-out infinite',
-            animationDelay: '1.7s',
+            position: 'absolute', bottom: -4, right: -8,
+            fontSize: 11, color: '#FFD700', lineHeight: 1,
+            animation: 'twinkle 1.8s ease-in-out infinite',
+            animationDelay: '1.2s',
             pointerEvents: 'none',
           }}>✦</span>
         </>
@@ -1840,12 +1884,14 @@ export default function PatientHomePage() {
           width:          60,
           height:         60,
           borderRadius:   '50%',
-          background:     '#1A1A1A',
+          background:     (todayCalories?.mealCount ?? 0) === 0 ? '#E8623A' : '#1A1A1A',
           border:         'none',
-          boxShadow:      '0 4px 16px rgba(0,0,0,0.25)',
+          boxShadow:      (todayCalories?.mealCount ?? 0) > 0
+            ? '0 4px 16px rgba(0,0,0,0.25)'
+            : undefined,
           animation:      (todayCalories?.mealCount ?? 0) > 0
             ? undefined
-            : 'breathe 2.8s ease-in-out infinite',
+            : 'breathe 2.2s ease-in-out infinite',
           cursor:         'pointer',
           display:        'flex',
           alignItems:     'center',

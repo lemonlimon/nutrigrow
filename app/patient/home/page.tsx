@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter }                   from 'next/navigation'
 import { createClient }                from '@supabase/supabase-js'
 import { WeightChart }                 from '@/components/WeightChart'
@@ -44,6 +44,7 @@ interface FoodLog {
   protein_g:              number | null
   carbs_g:                number | null
   fat_g:                  number | null
+  meal_score:             number | null
   meal_type:              string | null
   logged_at:              string
 }
@@ -210,6 +211,17 @@ function calcStreak(allLogDates: string[]): number {
   return streak
 }
 
+// ── Meal score derivation (client-side preview; server saves final) ───────────
+const SCORE_RANGES_CLIENT: Record<string, [number, number]> = {
+  green:  [8, 9],
+  yellow: [5, 7],
+  red:    [2, 4],
+}
+function deriveMealScore(tag: string | null): number {
+  const [min, max] = SCORE_RANGES_CLIENT[tag ?? 'yellow'] ?? [5, 7]
+  return min + Math.floor(Math.random() * (max - min + 1))
+}
+
 // ── Layout helpers ────────────────────────────────────────────────────────────
 function Shell({ children, isAr }: { children: React.ReactNode; isAr: boolean }) {
   return (
@@ -233,44 +245,77 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   )
 }
 
-// ── Daily Tip card ────────────────────────────────────────────────────────────
+// ── Daily Tip card (collapsible, default collapsed) ──────────────────────────
 function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const preview = tip.tip_en.length > 80
+    ? tip.tip_en.slice(0, 80).trim() + '…'
+    : tip.tip_en
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => setExpanded(p => !p)}
       style={{
+        width:        '100%',
         background:   '#0D5C45',
         borderRadius: 16,
         padding:      '20px 24px',
+        textAlign:    'left',
+        border:       'none',
+        cursor:       'pointer',
+        display:      'block',
       }}
     >
-      {/* Label */}
-      <p
-        className="font-dm-sans uppercase"
-        style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.12em', marginBottom: 10 }}
-      >
-        {isAr ? 'نصيحة اليوم' : "Today's insight"}
-      </p>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p
+          className="font-dm-sans uppercase"
+          style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.12em', margin: 0 }}
+        >
+          {isAr ? 'نصيحة اليوم' : "Today's Insight"}
+        </p>
+        <span style={{
+          fontSize:   16,
+          color:      'rgba(255,255,255,0.5)',
+          display:    'block',
+          transition: 'transform 0.2s',
+          transform:  expanded ? 'rotate(180deg)' : 'none',
+        }}>
+          ▾
+        </span>
+      </div>
 
-      {/* English tip */}
-      <p
-        className="font-dm-sans"
-        style={{ fontSize: 14, color: '#ffffff', lineHeight: 1.55, margin: 0 }}
-      >
-        {tip.tip_en}
-      </p>
+      {/* Collapsed preview */}
+      {!expanded && (
+        <p
+          className="font-dm-sans"
+          style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, margin: '8px 0 0' }}
+        >
+          {preview}
+        </p>
+      )}
 
-      {/* Divider */}
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.15)', margin: '14px 0' }} />
-
-      {/* Arabic tip */}
-      <p
-        className="font-tajawal"
-        dir="rtl"
-        style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.65, margin: 0, textAlign: 'right' }}
-      >
-        {tip.tip_ar}
-      </p>
-    </div>
+      {/* Expanded full content */}
+      {expanded && (
+        <>
+          <p
+            className="font-dm-sans"
+            style={{ fontSize: 14, color: '#ffffff', lineHeight: 1.55, margin: '10px 0 0' }}
+          >
+            {tip.tip_en}
+          </p>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.15)', margin: '14px 0' }} />
+          <p
+            className="font-tajawal"
+            dir="rtl"
+            style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.65, margin: 0, textAlign: 'right' }}
+          >
+            {tip.tip_ar}
+          </p>
+        </>
+      )}
+    </button>
   )
 }
 
@@ -304,6 +349,116 @@ function MacroPills({
         >
           {emoji} {label}
         </span>
+      ))}
+    </div>
+  )
+}
+
+// ── Meal Score Bar ────────────────────────────────────────────────────────────
+function MealScoreBar({ score }: { score: number }) {
+  const color =
+    score >= 7 ? '#1D9E75'
+    : score >= 4 ? '#F5A623'
+    :               '#C0392B'
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span className="font-dm-sans" style={{ fontSize: 11, color: '#999' }}>Meal Score</span>
+        <span className="font-dm-sans font-bold" style={{ fontSize: 11, color }}>{score}/10</span>
+      </div>
+      <div style={{ height: 4, background: '#F0F0F0', borderRadius: 99 }}>
+        <div style={{
+          height:       4,
+          width:        `${score * 10}%`,
+          background:   color,
+          borderRadius: 99,
+          transition:   'width 0.6s ease',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Hero Dashboard ────────────────────────────────────────────────────────────
+function HeroDashboard({
+  calLow, waterMl, weightDeltaKg,
+  onCalTap, onWaterTap, onWeightTap,
+}: {
+  calLow:         number
+  waterMl:        number
+  weightDeltaKg:  number | null
+  onCalTap:    () => void
+  onWaterTap:  () => void
+  onWeightTap: () => void
+}) {
+  const weightLabel =
+    weightDeltaKg === null ? '—'
+    : weightDeltaKg === 0  ? '0 kg'
+    : weightDeltaKg < 0    ? `${weightDeltaKg.toFixed(1)} kg`
+    :                        `+${weightDeltaKg.toFixed(1)} kg`
+  const weightColor =
+    weightDeltaKg === null ? '#999'
+    : weightDeltaKg < 0    ? '#1D9E75'
+    : weightDeltaKg > 0    ? '#C0392B'
+    :                        '#999'
+
+  const cards = [
+    {
+      icon:    '🔥',
+      value:   calLow > 0 ? `${calLow.toLocaleString()} kcal` : '— kcal',
+      label:   'Today',
+      onTap:   onCalTap,
+      color:   calLow > 0 ? '#1A1A1A' : '#BBB',
+    },
+    {
+      icon:    '💧',
+      value:   waterMl > 0 ? `${waterMl.toLocaleString()} ml` : '— ml',
+      label:   'Water',
+      onTap:   onWaterTap,
+      color:   waterMl > 0 ? '#1a6fa8' : '#BBB',
+    },
+    {
+      icon:    '⚖️',
+      value:   weightLabel,
+      label:   'On program',
+      onTap:   onWeightTap,
+      color:   weightColor,
+    },
+  ]
+
+  return (
+    <div style={{ display: 'flex', gap: 10 }}>
+      {cards.map(({ icon, value, label, onTap, color }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={onTap}
+          style={{
+            flex:          1,
+            background:    '#fff',
+            borderRadius:  16,
+            boxShadow:     '0 1px 4px rgba(0,0,0,0.06)',
+            border:        '1px solid #F0F0F0',
+            padding:       '14px 10px',
+            textAlign:     'center',
+            cursor:        'pointer',
+            minWidth:      0,
+          }}
+        >
+          <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
+          <div
+            className="font-dm-sans font-bold"
+            style={{ fontSize: 15, color, lineHeight: 1.2, wordBreak: 'break-word' }}
+          >
+            {value}
+          </div>
+          <div
+            className="font-dm-sans uppercase"
+            style={{ fontSize: 10, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}
+          >
+            {label}
+          </div>
+        </button>
       ))}
     </div>
   )
@@ -463,6 +618,7 @@ function FoodSection({
     protein_g?:              number
     carbs_g?:                number
     fat_g?:                  number
+    meal_score:              number
   } | null>(null)
   const [preview,      setPreview]     = useState<string | null>(null)
   const [mealType,     setMealType]    = useState<string | null>(null)
@@ -490,7 +646,7 @@ function FoodSection({
       const res  = await fetch('/api/food-log/analyze', { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok || !json.success) { setState('error'); return }
-      setPendingResult(json.data)
+      setPendingResult({ ...json.data, meal_score: deriveMealScore(json.data.tag) })
       setState('pending')
     } catch {
       setState('error')
@@ -509,6 +665,9 @@ function FoodSection({
       const json = await res.json()
       if (!res.ok || !json.success) { setState('error'); return }
 
+      // Server returns the authoritative meal_score; fall back to client preview
+      const savedScore: number = (json.data?.meal_score as number | undefined) ?? pendingResult.meal_score
+
       const confirmedMeal: FoodLog = {
         dish_name:              pendingResult.dish_name,
         tag:                    pendingResult.tag,
@@ -518,6 +677,7 @@ function FoodSection({
         protein_g:              pendingResult.protein_g ?? null,
         carbs_g:                pendingResult.carbs_g   ?? null,
         fat_g:                  pendingResult.fat_g     ?? null,
+        meal_score:             savedScore,
         meal_type:              mealType ?? null,
         logged_at:              new Date().toISOString(),
       }
@@ -750,6 +910,7 @@ function FoodSection({
                   carbs_g={pendingResult.carbs_g}
                   fat_g={pendingResult.fat_g}
                 />
+                <MealScoreBar score={pendingResult.meal_score} />
               </div>
             </div>
 
@@ -852,6 +1013,7 @@ function LastMealSection({ lastMeal, isAr }: { lastMeal: FoodLog; isAr: boolean 
         </p>
       )}
       <MacroPills protein_g={lastMeal.protein_g} carbs_g={lastMeal.carbs_g} fat_g={lastMeal.fat_g} />
+      {lastMeal.meal_score != null && <MealScoreBar score={lastMeal.meal_score} />}
 
       {lastMeal.tag && (
         <span
@@ -1104,7 +1266,16 @@ export default function PatientHomePage() {
     carbsG:   number
     fatG:     number
   } | null>(null)
+  const [waterMl,      setWaterMl]      = useState(0)
   const [loading,      setLoading]      = useState(true)
+
+  // Scroll-anchor refs for hero dashboard cards
+  const weightRef = useRef<HTMLDivElement>(null)
+  const foodRef   = useRef<HTMLDivElement>(null)
+  const waterRef  = useRef<HTMLDivElement>(null)
+  const scrollTo  = useCallback((ref: React.RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
 
   const isAr          = patient?.preferred_language === 'ar'
   const t             = T[isAr ? 'ar' : 'en']
@@ -1159,7 +1330,7 @@ export default function PatientHomePage() {
         { data: todayFoodData },
       ] = await Promise.all([
         db.from('food_logs')
-          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, protein_g, carbs_g, fat_g, meal_type, logged_at')
+          .select('dish_name, tag, note_en, calories_estimate_low, calories_estimate_high, protein_g, carbs_g, fat_g, meal_score, meal_type, logged_at')
           .eq('patient_id', pat.id)
           .order('logged_at', { ascending: false })
           .limit(1),
@@ -1199,8 +1370,14 @@ export default function PatientHomePage() {
         setTodayCalories({ low, high, mealCount: todayFoodData.length, proteinG, carbsG, fatG })
       }
 
-      // Fetch daily tip (fire-and-forget — page renders without blocking)
+      // Fetch today's water (fire-and-forget)
       const today = new Date().toISOString().slice(0, 10)
+      fetch(`/api/water-log?patientId=${pat.id}&date=${today}`)
+        .then(r => r.json())
+        .then(json => { if (json.success) setWaterMl(json.data.glasses ?? 0) })
+        .catch(() => { /* fail silently */ })
+
+      // Fetch daily tip (fire-and-forget — page renders without blocking)
       fetch(`/api/daily-tip?patientId=${pat.id}&date=${today}`)
         .then(r => r.json())
         .then(json => { if (json.success) setDailyTip(json.data) })
@@ -1221,10 +1398,15 @@ export default function PatientHomePage() {
 
   if (!patient) return null
 
+  // Weight delta for hero card (latest log vs enrolled weight)
+  const weightDelta = weightLogs.length > 0
+    ? Math.round((weightLogs[0].weight_kg - patient.weight_kg) * 10) / 10
+    : null
+
   return (
     <Shell isAr={isAr}>
 
-      {/* Greeting + Feature 3: streak indicator */}
+      {/* Greeting + streak */}
       <div className="px-1">
         <p className={`text-xl text-gray-900 ${isAr ? 'font-tajawal' : 'font-playfair'}`}>
           {t.greeting(patient.first_name)}
@@ -1234,54 +1416,66 @@ export default function PatientHomePage() {
             className="font-dm-sans mt-1"
             style={{ fontSize: 13, color: streak >= 2 ? '#0D5C45' : '#666' }}
           >
-            {streak >= 2
-              ? `🔥 ${streak} day streak`
-              : 'Good start — come back tomorrow'}
+            {streak >= 2 ? `🔥 ${streak} day streak` : 'Good start — come back tomorrow'}
           </p>
         )}
       </div>
 
-      {/* Daily Tip — first card, only shown once tip loads */}
-      {dailyTip && <TipCard tip={dailyTip} isAr={isAr} />}
-
-      <WeightSection
-        patient={patient}
-        weightLogs={weightLogs}
-        isAr={isAr}
-        onSaved={log => setWeightLogs(prev => [log, ...prev].slice(0, 8))}
+      {/* ── Hero Dashboard ── */}
+      <HeroDashboard
+        calLow={todayCalories?.low ?? 0}
+        waterMl={waterMl}
+        weightDeltaKg={weightDelta}
+        onCalTap={() => scrollTo(foodRef)}
+        onWaterTap={() => scrollTo(waterRef)}
+        onWeightTap={() => scrollTo(weightRef)}
       />
 
-      {/* Water Tracker — after weight, before food */}
-      <WaterCard patientId={patient.id} />
+      {/* ── Weight chart + history ── */}
+      <div ref={weightRef}>
+        <WeightSection
+          patient={patient}
+          weightLogs={weightLogs}
+          isAr={isAr}
+          onSaved={log => setWeightLogs(prev => [log, ...prev].slice(0, 8))}
+        />
+      </div>
 
-      {/* Daily Calorie Running Total */}
-      <CalorieRingCard
-        low={todayCalories?.low       ?? 0}
-        mealCount={todayCalories?.mealCount ?? 0}
-        proteinG={todayCalories?.proteinG   ?? 0}
-        carbsG={todayCalories?.carbsG       ?? 0}
-        fatG={todayCalories?.fatG           ?? 0}
-      />
+      {/* ── Food section: calorie ring + log + last meal ── */}
+      <div ref={foodRef} className="space-y-4">
+        <CalorieRingCard
+          low={todayCalories?.low       ?? 0}
+          mealCount={todayCalories?.mealCount ?? 0}
+          proteinG={todayCalories?.proteinG   ?? 0}
+          carbsG={todayCalories?.carbsG       ?? 0}
+          fatG={todayCalories?.fatG           ?? 0}
+        />
 
-      <FoodSection
-        patient={patient}
-        isAr={isAr}
-        onConfirmed={(meal, calLow, calHigh) => {
-          setLastMeal(meal)
-          setTodayCalories(prev => ({
-            low:       (prev?.low      ?? 0) + calLow,
-            high:      (prev?.high     ?? 0) + calHigh,
-            mealCount: (prev?.mealCount ?? 0) + 1,
-            proteinG:  (prev?.proteinG  ?? 0) + (meal.protein_g ?? 0),
-            carbsG:    (prev?.carbsG    ?? 0) + (meal.carbs_g   ?? 0),
-            fatG:      (prev?.fatG      ?? 0) + (meal.fat_g     ?? 0),
-          }))
-        }}
-      />
+        <FoodSection
+          patient={patient}
+          isAr={isAr}
+          onConfirmed={(meal, calLow, calHigh) => {
+            setLastMeal(meal)
+            setTodayCalories(prev => ({
+              low:       (prev?.low      ?? 0) + calLow,
+              high:      (prev?.high     ?? 0) + calHigh,
+              mealCount: (prev?.mealCount ?? 0) + 1,
+              proteinG:  (prev?.proteinG  ?? 0) + (meal.protein_g ?? 0),
+              carbsG:    (prev?.carbsG    ?? 0) + (meal.carbs_g   ?? 0),
+              fatG:      (prev?.fatG      ?? 0) + (meal.fat_g     ?? 0),
+            }))
+          }}
+        />
 
-      {/* Feature 1: last meal card — only shown if a food log exists */}
-      {lastMeal && <LastMealSection lastMeal={lastMeal} isAr={isAr} />}
+        {lastMeal && <LastMealSection lastMeal={lastMeal} isAr={isAr} />}
+      </div>
 
+      {/* ── Water tracker ── */}
+      <div ref={waterRef}>
+        <WaterCard patientId={patient.id} />
+      </div>
+
+      {/* ── Daily context ── */}
       <ContextSection
         patient={patient}
         todayContext={todayContext}
@@ -1293,6 +1487,9 @@ export default function PatientHomePage() {
           setTodayContext(ctx)
         }}
       />
+
+      {/* ── Today's Insight (collapsible, bottom of page) ── */}
+      {dailyTip && <TipCard tip={dailyTip} isAr={isAr} />}
 
     </Shell>
   )

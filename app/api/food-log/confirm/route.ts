@@ -7,6 +7,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
+// Score ranges by tag — randomised per confirm so every meal feels distinct
+const SCORE_RANGES: Record<string, [number, number]> = {
+  green:  [8, 9],
+  yellow: [5, 7],
+  red:    [2, 4],
+}
+function computeMealScore(tag: string): number {
+  const [min, max] = SCORE_RANGES[tag] ?? [5, 7]
+  return min + Math.floor(Math.random() * (max - min + 1))
+}
+
 interface FoodAnalysis {
   dish_name:              string
   calories_estimate_low:  number
@@ -59,6 +70,7 @@ export async function POST(request: Request) {
   const mealType     = (typeof rawMealType === 'string' && VALID_MEAL_TYPES.includes(rawMealType))
     ? rawMealType
     : null
+  const mealScore    = computeMealScore(safeAnalysis.tag)
 
   // Rate limiting: max 10 confirmed meals per patient per 24h
   const admin    = createAdminClient()
@@ -88,6 +100,7 @@ export async function POST(request: Request) {
     note_en:                safeAnalysis.note_en,
     note_ar:                safeAnalysis.note_ar,
     meal_type:              mealType,
+    meal_score:             mealScore,
   })
 
   if (insertError) {
@@ -98,5 +111,5 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, data: { meal_score: mealScore } })
 }

@@ -710,14 +710,20 @@ function WeightSection({
 
 // ── Feature 2: Daily food photo (confirm/retake flow) ─────────────────────────
 function FoodSection({
-  patient, isAr, onConfirmed,
+  patient, isAr, onConfirmed, onPickFile,
 }: {
   patient:     Patient
   isAr:        boolean
   onConfirmed: (meal: FoodLog, calLow: number, calHigh: number) => void
+  onPickFile?: (trigger: () => void) => void
 }) {
   const t       = T[isAr ? 'ar' : 'en']
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Register file-picker trigger with parent so the floating FAB can call it
+  useEffect(() => {
+    onPickFile?.(() => fileRef.current?.click())
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   type FoodState = 'idle' | 'analyzing' | 'pending' | 'confirming' | 'done' | 'error'
   const [state,         setState]        = useState<FoodState>('idle')
@@ -1360,6 +1366,95 @@ function CalorieRingCard({
   )
 }
 
+// ── Calendar Date Strip ───────────────────────────────────────────────────────
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const
+
+function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
+  const today     = new Date()
+  const todayStr  = today.toDateString()
+
+  // Build Sun–Sat of current week
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - today.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  })
+
+  return (
+    <div
+      style={{
+        position:     'sticky',
+        top:          0,
+        zIndex:       10,
+        background:   '#FFFFFF',
+        borderBottom: '1px solid #F0F0F0',
+        padding:      '12px 16px',
+        display:      'flex',
+        justifyContent: 'space-around',
+      }}
+    >
+      {days.map((d, i) => {
+        const dStr    = d.toDateString()
+        const isToday  = dStr === todayStr
+        const isFuture = d > today && !isToday
+        const hasLog   = loggedDates.has(dStr)
+        const isPast   = !isToday && !isFuture
+
+        const numColor = isToday ? '#FFFFFF' : hasLog ? '#1D9E75' : '#CCC'
+
+        return (
+          <div
+            key={i}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
+          >
+            {/* Day letter */}
+            <span
+              className="font-dm-sans"
+              style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', lineHeight: 1.4 }}
+            >
+              {DAY_LETTERS[i]}
+            </span>
+
+            {/* Day number — circle for today or logged days */}
+            <div
+              style={{
+                width:          36,
+                height:         36,
+                borderRadius:   '50%',
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                background:     isToday ? '#0D5C45' : 'transparent',
+                border:         hasLog && !isToday ? '2px solid #1D9E75' : '2px solid transparent',
+              }}
+            >
+              <span className="font-dm-sans" style={{ fontSize: 14, color: numColor }}>
+                {d.getDate()}
+              </span>
+            </div>
+
+            {/* Activity dot */}
+            <div
+              style={{
+                width:        4,
+                height:       4,
+                borderRadius: '50%',
+                marginTop:    3,
+                background:   hasLog ? '#1D9E75' : 'transparent',
+                border:       isPast && !hasLog ? '1px solid #CCC' : 'none',
+              }}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PatientHomePage() {
   const router = useRouter()
@@ -1381,13 +1476,25 @@ export default function PatientHomePage() {
   } | null>(null)
   const [waterMl,      setWaterMl]      = useState(0)
   const [loading,      setLoading]      = useState(true)
+  const [greeting,     setGreeting]     = useState('Good to see you')
+  const [loggedDates,  setLoggedDates]  = useState<Set<string>>(new Set())
 
   // Scroll-anchor refs for hero dashboard cards
-  const weightRef = useRef<HTMLDivElement>(null)
-  const foodRef   = useRef<HTMLDivElement>(null)
-  const waterRef  = useRef<HTMLDivElement>(null)
+  const weightRef          = useRef<HTMLDivElement>(null)
+  const foodRef            = useRef<HTMLDivElement>(null)
+  const waterRef           = useRef<HTMLDivElement>(null)
+  const triggerFoodPickRef = useRef<(() => void) | null>(null)
   const scrollTo  = useCallback((ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  // Time-based greeting (client-side only — avoids server/client hydration mismatch)
+  useEffect(() => {
+    const h = new Date().getHours()
+    if (h >= 5 && h < 12)       setGreeting('Good morning')
+    else if (h >= 12 && h < 17) setGreeting('Good afternoon')
+    else if (h >= 17 && h < 21) setGreeting('Good evening')
+    else                         setGreeting('Good night')
   }, [])
 
   const isAr          = patient?.preferred_language === 'ar'
@@ -1503,6 +1610,23 @@ export default function PatientHomePage() {
         .then(json => { if (json.success) setDailyTip(json.data) })
         .catch(() => { /* fail silently — tip is non-critical */ })
 
+      // Fetch calendar strip: food_logs for current Sun–Sat week (fire-and-forget)
+      const weekStartCal = new Date()
+      weekStartCal.setDate(weekStartCal.getDate() - weekStartCal.getDay())
+      weekStartCal.setHours(0, 0, 0, 0)
+      const weekEndCal = new Date(weekStartCal)
+      weekEndCal.setDate(weekEndCal.getDate() + 7)
+      db.from('food_logs')
+        .select('logged_at')
+        .eq('patient_id', pat.id)
+        .gte('logged_at', weekStartCal.toISOString())
+        .lt('logged_at', weekEndCal.toISOString())
+        .then(({ data: weekLogs }) => {
+          setLoggedDates(new Set(
+            weekLogs?.map(l => new Date(l.logged_at).toDateString()) ?? []
+          ))
+        })
+
       setLoading(false)
     }
     load()
@@ -1524,12 +1648,25 @@ export default function PatientHomePage() {
     : null
 
   return (
+    <>
     <Shell isAr={isAr}>
+
+      {/* ── Calendar Date Strip — full-width, sticky ── */}
+      <div style={{ margin: '0 -16px' }}>
+        <DateStrip loggedDates={loggedDates} />
+      </div>
 
       {/* Greeting + streak */}
       <div className="px-1">
         <p className={`text-xl text-gray-900 ${isAr ? 'font-tajawal' : 'font-playfair'}`}>
-          {t.greeting(patient.first_name)}
+          {isAr
+            ? t.greeting(patient.first_name)
+            : `${greeting}, ${patient.first_name}. ${
+                greeting === 'Good morning'   ? '🌅' :
+                greeting === 'Good afternoon' ? '☀️' :
+                greeting === 'Good evening'   ? '🌆' : '🌙'
+              }`
+          }
         </p>
         {streak >= 1 && (
           <p
@@ -1575,6 +1712,7 @@ export default function PatientHomePage() {
         <FoodSection
           patient={patient}
           isAr={isAr}
+          onPickFile={fn => { triggerFoodPickRef.current = fn }}
           onConfirmed={(meal, calLow, calHigh) => {
             setLastMeal(meal)
             setTodayCalories(prev => ({
@@ -1613,5 +1751,51 @@ export default function PatientHomePage() {
       {dailyTip && <TipCard tip={dailyTip} isAr={isAr} />}
 
     </Shell>
+
+    {/* ── Floating Camera FAB ── */}
+    <style>{`
+      @keyframes pulse-ring {
+        0%   { box-shadow: 0 0 0 0 rgba(26,26,26,0.3); }
+        70%  { box-shadow: 0 0 0 10px rgba(26,26,26,0); }
+        100% { box-shadow: 0 0 0 0 rgba(26,26,26,0); }
+      }
+      .mizan-fab { transition: transform 150ms ease; }
+      .mizan-fab:hover, .mizan-fab:active { transform: scale(1.08); }
+    `}</style>
+    <button
+      type="button"
+      onClick={() => triggerFoodPickRef.current?.()}
+      className="mizan-fab"
+      aria-label="Log a meal"
+      style={{
+        position:       'fixed',
+        bottom:         88,
+        right:          20,
+        width:          60,
+        height:         60,
+        borderRadius:   '50%',
+        background:     '#1A1A1A',
+        border:         'none',
+        boxShadow:      '0 4px 16px rgba(0,0,0,0.25)',
+        animation:      (todayCalories?.mealCount ?? 0) > 0
+          ? undefined
+          : 'pulse-ring 2.5s ease infinite',
+        cursor:         'pointer',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        zIndex:         100,
+      }}
+    >
+      <svg
+        width="26" height="26" viewBox="0 0 24 24"
+        fill="none" stroke="white" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"
+      >
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </button>
+    </>
   )
 }

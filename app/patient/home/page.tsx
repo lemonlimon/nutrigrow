@@ -258,11 +258,11 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
       onClick={() => setExpanded(p => !p)}
       style={{
         width:        '100%',
-        background:   '#0D5C45',
+        background:   '#FFFFFF',
         borderRadius: 16,
         padding:      '20px 24px',
         textAlign:    'left',
-        border:       'none',
+        border:       '1px solid #E8F5F0',
         cursor:       'pointer',
         display:      'block',
       }}
@@ -271,13 +271,13 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <p
           className="font-dm-sans uppercase"
-          style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.12em', margin: 0 }}
+          style={{ fontSize: 10, color: '#999999', letterSpacing: '0.12em', margin: 0 }}
         >
           {isAr ? 'نصيحة اليوم' : "Today's Insight"}
         </p>
         <span style={{
           fontSize:   16,
-          color:      'rgba(255,255,255,0.5)',
+          color:      '#999999',
           display:    'block',
           transition: 'transform 0.2s',
           transform:  expanded ? 'rotate(180deg)' : 'none',
@@ -290,7 +290,7 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
       {!expanded && (
         <p
           className="font-dm-sans"
-          style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, margin: '8px 0 0' }}
+          style={{ fontSize: 14, color: '#333333', lineHeight: 1.45, margin: '8px 0 0' }}
         >
           {preview}
         </p>
@@ -301,15 +301,15 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
         <>
           <p
             className="font-dm-sans"
-            style={{ fontSize: 14, color: '#ffffff', lineHeight: 1.55, margin: '10px 0 0' }}
+            style={{ fontSize: 14, color: '#333333', lineHeight: 1.55, margin: '10px 0 0' }}
           >
             {tip.tip_en}
           </p>
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.15)', margin: '14px 0' }} />
+          <div style={{ height: 1, background: '#E8F5F0', margin: '14px 0' }} />
           <p
             className="font-tajawal"
             dir="rtl"
-            style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.65, margin: 0, textAlign: 'right' }}
+            style={{ fontSize: 14, color: '#333333', lineHeight: 1.65, margin: 0, textAlign: 'right' }}
           >
             {tip.tip_ar}
           </p>
@@ -402,20 +402,23 @@ function HeroDashboard({
     : weightDeltaKg > 0    ? '#C0392B'
     :                        '#999'
 
+  const calPct   = Math.round(calLow   / 1800 * 100)
+  const waterPct = Math.round(waterMl  / 2000 * 100)
+
   const cards = [
     {
       icon:    '🔥',
-      value:   calLow > 0 ? `${calLow.toLocaleString()} kcal` : '— kcal',
+      value:   calLow > 0 ? `${calPct}%` : '—',
       label:   'Today',
       onTap:   onCalTap,
-      color:   calLow > 0 ? '#1A1A1A' : '#BBB',
+      color:   calLow <= 0 ? '#BBB' : calLow > 1800 ? '#C0392B' : '#1D9E75',
     },
     {
       icon:    '💧',
-      value:   waterMl > 0 ? `${waterMl.toLocaleString()} ml` : '— ml',
+      value:   waterMl > 0 ? `${waterPct}%` : '—',
       label:   'Water',
       onTap:   onWaterTap,
-      color:   waterMl > 0 ? '#1a6fa8' : '#BBB',
+      color:   waterMl > 0 ? '#1D9E75' : '#BBB',
     },
     {
       icon:    '⚖️',
@@ -553,7 +556,10 @@ function WeightSection({
       )}
 
       {/* Input row */}
-      <div className={`flex gap-2 ${isAr ? 'flex-row-reverse' : ''}`}>
+      <div
+        className={`flex gap-2 ${isAr ? 'flex-row-reverse' : ''}`}
+        style={{ width: '100%', alignItems: 'center' }}
+      >
         <input
           type="number"
           inputMode="decimal"
@@ -563,8 +569,12 @@ function WeightSection({
           className={`flex-1 px-4 py-3 border border-gray-200 rounded-btn text-gray-900 text-base
                       focus:outline-none focus:ring-2 focus:ring-brand-mid
                       ${isAr ? 'font-tajawal text-right' : 'font-dm-sans'}`}
+          style={{ minWidth: 0 }}
         />
-        <div className="flex rounded-btn border border-gray-200 overflow-hidden text-sm font-dm-sans">
+        <div
+          className="flex rounded-btn border border-gray-200 overflow-hidden text-sm font-dm-sans"
+          style={{ flexShrink: 0 }}
+        >
           {(['kg', 'lbs'] as const).map(u => (
             <button key={u} type="button" onClick={() => setUnit(u)}
               className={`px-3 py-3 transition-colors ${
@@ -1302,8 +1312,15 @@ export default function PatientHomePage() {
         .select('weight_kg, logged_at')
         .eq('patient_id', pat.id)
         .order('logged_at', { ascending: false })
-        .limit(8)
-      setWeightLogs(wLogs ?? [])
+        .limit(20)
+      const seen = new Set<string>()
+      const deduped = (wLogs ?? []).filter(log => {
+        const date = new Date(log.logged_at).toDateString()
+        if (seen.has(date)) return false
+        seen.add(date)
+        return true
+      })
+      setWeightLogs(deduped.slice(0, 8))
 
       const { data: cLogs } = await db
         .from('context_logs')

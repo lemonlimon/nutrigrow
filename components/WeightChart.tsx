@@ -98,6 +98,12 @@ export function WeightChart({ points, baseline, unit = 'kg' }: WeightChartProps)
   const sign      = deltaAbs >= 0 ? '+' : ''
   const deltaStr  = `${sign}${deltaAbs.toFixed(1)} ${unit} (${sign}${deltaPct}%)`
   const deltaColor = deltaAbs < 0 ? '#1D9E75' : deltaAbs > 0 ? '#B94040' : '#888'
+
+  // ── Trend-based chart colors (green for loss, grey for gain/flat) ──────────
+  const trendDown = deltaAbs < 0
+  const lineColor = trendDown ? '#1D9E75' : '#888888'
+  const gradId    = trendDown ? 'weightGrad-green' : 'weightGrad-grey'
+  const gradColor = trendDown ? '#1D9E75'  : '#888888'
   const deltaX    = toX(lastIdx) + 8
   const deltaY    = toY(lastV)
 
@@ -128,10 +134,10 @@ export function WeightChart({ points, baseline, unit = 'kg' }: WeightChartProps)
       style={{ display: 'block', overflow: 'visible' }}
     >
       <defs>
-        {/* Gradient fill under the line */}
-        <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#1D9E75" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#1D9E75" stopOpacity="0"    />
+        {/* Gradient fill under the line — switches color based on trend */}
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={gradColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={gradColor} stopOpacity="0"    />
         </linearGradient>
       </defs>
 
@@ -154,13 +160,13 @@ export function WeightChart({ points, baseline, unit = 'kg' }: WeightChartProps)
       </text>
 
       {/* Area fill */}
-      <path d={areaPath} fill="url(#weightGrad)" />
+      <path d={areaPath} fill={`url(#${gradId})`} />
 
       {/* Line */}
       <path
         d={lineSegments}
         fill="none"
-        stroke="#1D9E75"
+        stroke={lineColor}
         strokeWidth="1.5"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -185,7 +191,7 @@ export function WeightChart({ points, baseline, unit = 'kg' }: WeightChartProps)
               cy={cy.toFixed(1)}
               r="4"
               fill="white"
-              stroke="#0D5C45"
+              stroke={lineColor}
               strokeWidth="2"
               pointerEvents="none"
             />

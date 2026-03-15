@@ -4,8 +4,10 @@ import { startOfDay }        from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { AdminClinicSwitcher } from '../AdminClinicSwitcher'
 
-const TIMEZONE = 'Asia/Riyadh'
+const TIMEZONE    = 'Asia/Riyadh'
+const DEFAULT_CLINIC = '00000000-0000-0000-0000-000000000001'
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 function IconPerson() {
@@ -73,21 +75,40 @@ function fmtLastLogged(lastLoggedAt: string | undefined): string {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default async function DashboardPage() {
-  // ── Auth + dynamic clinic ID ───────────────────────────────────────────────
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>
+}) {
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: clinicData } = await admin
-    .from('clinics')
-    .select('id')
-    .eq('owner_user_id', user.id)
+
+  // ── Role lookup ───────────────────────────────────────────────────────────
+  const { data: roleData } = await admin
+    .from('user_roles')
+    .select('role, clinic_id')
+    .eq('user_id', user.id)
     .single()
 
-  const clinicId = clinicData?.id
+  const isAdmin = roleData?.role === 'admin'
+  const requestedClinic = typeof searchParams?.clinic === 'string'
+    ? searchParams.clinic
+    : undefined
+
+  const clinicId = isAdmin
+    ? (requestedClinic ?? DEFAULT_CLINIC)
+    : roleData?.clinic_id
+
   if (!clinicId) redirect('/login')
+
+  // ── For admin: fetch all clinics for the switcher ─────────────────────────
+  const allClinics = isAdmin
+    ? ((await admin.from('clinics').select('id, name').order('name')).data ?? [])
+    : []
 
   // ── Timezone-aware "today" for KSA/UAE (UTC+3) ────────────────────────────
   const nowInRiyadh  = toZonedTime(new Date(), TIMEZONE)
@@ -102,11 +123,11 @@ export default async function DashboardPage() {
   // Step 1: fetch patients first (need IDs for sub-queries)
   const { data: patients } = await admin
     .from('patients')
-    .select('id, first_name, bmi, enrolled_at')
+    .select('id, first_name, last_name, bmi, enrolled_at')
     .eq('clinic_id', clinicId)
     .order('enrolled_at', { ascending: false })
 
-  type PatientRow = { id: string; first_name: string; bmi: number | null; enrolled_at: string }
+  type PatientRow = { id: string; first_name: string; last_name: string | null; bmi: number | null; enrolled_at: string }
   const rows        = (patients ?? []) as PatientRow[]
   const totalPatients = rows.length
   const patientIds    = rows.map(p => p.id)
@@ -197,6 +218,11 @@ export default async function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
+    {/* ── Admin clinic switcher (admin only) ── */}
+    {isAdmin && (
+      <AdminClinicSwitcher clinics={allClinics} currentClinicId={clinicId} />
+    )}
+
     {/* ── Today's date ── */}
     <p
       className="font-dm-sans"
@@ -302,6 +328,7 @@ export default async function DashboardPage() {
         const tier       = getActivityTier(lastFood?.logged_at)
         const dotColor   = DOT_COLOR[tier]
         const lastLogTxt = fmtLastLogged(lastFood?.logged_at)
+        const fullName   = p.last_name ? `${p.first_name} ${p.last_name}` : p.first_name
 
         return (
           <Link
@@ -325,7 +352,7 @@ export default async function DashboardPage() {
             {/* Name + last logged */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <p className="font-dm-sans" style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
-                {p.first_name}
+                {fullName}
               </p>
               <p className="font-dm-sans" style={{ fontSize: 13, color: '#999', margin: '2px 0 0' }}>
                 {lastLogTxt}

@@ -1,13 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that require a logged-in clinic user
+// Routes that require a logged-in admin/clinic user
 const CLINIC_ROUTES = ['/dashboard', '/patients']
 
 function isClinicRoute(pathname: string): boolean {
   return CLINIC_ROUTES.some(
     route => pathname === route || pathname.startsWith(route + '/')
   )
+}
+
+function isPatientRoute(pathname: string): boolean {
+  return pathname === '/patient/home' || pathname.startsWith('/patient/home/')
+}
+
+function redirect(request: NextRequest, pathname: string): NextResponse {
+  const url = request.nextUrl.clone()
+  url.pathname = pathname
+  return NextResponse.redirect(url)
 }
 
 export async function middleware(request: NextRequest) {
@@ -40,18 +50,43 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Unauthenticated user hitting a clinic route → send to /login
-  if (!user && isClinicRoute(pathname)) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  // ── Unauthenticated ────────────────────────────────────────────────────────
+  if (!user) {
+    if (isClinicRoute(pathname) || isPatientRoute(pathname)) {
+      return redirect(request, '/login')
+    }
+    return supabaseResponse
   }
 
-  // Logged-in user hitting /login → send to /dashboard
-  if (user && pathname === '/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  // ── Authenticated — look up role ───────────────────────────────────────────
+  // user_roles must have RLS: SELECT WHERE user_id = auth.uid()
+  const { data: roleData } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single()
+
+  const role = roleData?.role as 'admin' | 'clinic' | 'patient' | undefined
+
+  // ── /login — redirect based on role ───────────────────────────────────────
+  if (pathname === '/login') {
+    if (role === 'patient') return redirect(request, '/patient/home')
+    return redirect(request, '/dashboard')
+  }
+
+  // ── Clinic/admin routes (/dashboard, /patients) ────────────────────────────
+  if (isClinicRoute(pathname)) {
+    if (role === 'patient') return redirect(request, '/patient/home')
+    if (!role)              return redirect(request, '/login')
+    // role === 'admin' or 'clinic' → allow through
+    return supabaseResponse
+  }
+
+  // ── Patient route (/patient/home) ──────────────────────────────────────────
+  if (isPatientRoute(pathname)) {
+    if (role === 'clinic') return redirect(request, '/dashboard')
+    // role === 'admin' (impersonation), 'patient', or no role → allow
+    return supabaseResponse
   }
 
   return supabaseResponse

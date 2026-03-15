@@ -56,7 +56,7 @@ export default async function PatientDetailPage({
   ] = await Promise.all([
     admin
       .from('patients')
-      .select('id, first_name, weight_kg, enrolled_at, age, bmi')
+      .select('id, first_name, last_name, date_of_birth, weight_kg, enrolled_at, age, bmi')
       .eq('id', patientId)
       .single(),
 
@@ -160,7 +160,12 @@ export default async function PatientDetailPage({
     .join(', ')
 
   // ── Pill helper ───────────────────────────────────────────────────────────
-  const typedPatient = patient as (typeof patient & { age?: number | null; bmi?: number | null }) | null
+  const typedPatient = patient as (typeof patient & {
+    last_name?: string | null
+    date_of_birth?: string | null
+    age?: number | null
+    bmi?: number | null
+  }) | null
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -189,7 +194,11 @@ export default async function PatientDetailPage({
           className="font-playfair font-bold"
           style={{ fontSize: 28, color: '#1A1A1A', margin: 0 }}
         >
-          {typedPatient ? typedPatient.first_name : `Patient ${patientId.slice(0, 8)}…`}
+          {typedPatient
+            ? typedPatient.last_name
+              ? `${typedPatient.first_name} ${typedPatient.last_name}`
+              : typedPatient.first_name
+            : `Patient ${patientId.slice(0, 8)}…`}
         </h2>
 
         {/* Info pills */}
@@ -209,6 +218,14 @@ export default async function PatientDetailPage({
                 style={{ background: '#F5F5F5', color: '#666', fontSize: 12, borderRadius: 20, padding: '4px 12px' }}
               >
                 Age {typedPatient.age}
+              </span>
+            )}
+            {typedPatient.date_of_birth != null && (
+              <span
+                className="font-dm-sans"
+                style={{ background: '#F5F5F5', color: '#666', fontSize: 12, borderRadius: 20, padding: '4px 12px' }}
+              >
+                DOB {format(parseISO(typedPatient.date_of_birth), 'MMM d, yyyy')}
               </span>
             )}
             <span

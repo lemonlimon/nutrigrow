@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 interface Patient {
   id:          string
   first_name:  string
+  last_name:   string | null
   age:         number | null
   sex:         string | null
   weight_kg:   number | null
@@ -35,26 +36,42 @@ function fmtLastLogged(iso: string | undefined): string {
   return `Last logged ${diffDays} days ago`
 }
 
-export default async function PatientsPage() {
-  // ── Auth + dynamic clinic ID ───────────────────────────────────────────────
+const DEFAULT_CLINIC = '00000000-0000-0000-0000-000000000001'
+
+export default async function PatientsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>
+}) {
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: clinicData } = await admin
-    .from('clinics')
-    .select('id')
-    .eq('owner_user_id', user.id)
+
+  // ── Role lookup ───────────────────────────────────────────────────────────
+  const { data: roleData } = await admin
+    .from('user_roles')
+    .select('role, clinic_id')
+    .eq('user_id', user.id)
     .single()
 
-  const clinicId = clinicData?.id
+  const isAdmin = roleData?.role === 'admin'
+  const requestedClinic = typeof searchParams?.clinic === 'string'
+    ? searchParams.clinic
+    : undefined
+
+  const clinicId = isAdmin
+    ? (requestedClinic ?? DEFAULT_CLINIC)
+    : roleData?.clinic_id
+
   if (!clinicId) redirect('/login')
 
   // ── Fetch patients ────────────────────────────────────────────────────────
   const { data: patients, error } = await admin
     .from('patients')
-    .select('id, first_name, age, sex, weight_kg, enrolled_at')
+    .select('id, first_name, last_name, age, sex, weight_kg, enrolled_at')
     .eq('clinic_id', clinicId)
     .order('enrolled_at', { ascending: false })
 
@@ -138,7 +155,7 @@ export default async function PatientsPage() {
                 {/* CHANGE 1: patient name in near-black */}
                 <p className="font-dm-sans font-semibold text-base truncate"
                    style={{ color: '#1a1a1a' }}>
-                  {p.first_name}
+                  {p.last_name ? `${p.first_name} ${p.last_name}` : p.first_name}
                 </p>
                 <p className="font-dm-sans text-sm mt-0.5" style={{ color: '#666' }}>
                   {capitalize(p.sex)}

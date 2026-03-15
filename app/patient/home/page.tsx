@@ -228,7 +228,7 @@ function Shell({ children, isAr }: { children: React.ReactNode; isAr: boolean })
     <div
       dir={isAr ? 'rtl' : undefined}
       lang={isAr ? 'ar' : undefined}
-      className="min-h-screen bg-canvas px-4 py-8"
+      className="min-h-screen bg-canvas px-4 pt-8 pb-24"
     >
       <div className="w-full max-w-[480px] mx-auto space-y-4">
         {children}

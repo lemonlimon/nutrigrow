@@ -1591,9 +1591,17 @@ function AdminBanner({ patientName }: { patientName: string }) {
 export default function PatientHomeClient({
   adminPatientId   = null,
   adminPatientName = null,
+  adminPatient     = null,
 }: {
   adminPatientId?:   string | null
   adminPatientName?: string | null
+  adminPatient?: {
+    id:                 string
+    first_name:         string
+    preferred_language: string
+    weight_kg:          number
+    enrolled_at:        string
+  } | null
 } = {}) {
   const [patient,      setPatient]      = useState<Patient | null>(null)
   const [weightLogs,   setWeightLogs]   = useState<WeightLog[]>([])
@@ -1650,22 +1658,24 @@ export default function PatientHomeClient({
       const { data: { user }, error: authErr } = await db.auth.getUser()
       if (authErr || !user) { window.location.href = '/login'; return }
 
-      // Admin impersonation: if adminPatientId is provided (set by server wrapper
-      // after verifying the admin cookie), load that patient directly.
-      // Requires RLS policy: admin users can SELECT from patients table for all rows.
-      const patQuery = adminPatientId
-        ? db.from('patients')
-            .select('id, first_name, preferred_language, weight_kg, enrolled_at')
-            .eq('id', adminPatientId)
-            .single()
-        : db.from('patients')
-            .select('id, first_name, preferred_language, weight_kg, enrolled_at')
-            .eq('user_id', user.id)
-            .single()
-
-      const { data: pat, error: patErr } = await patQuery
-      if (patErr || !pat) { window.location.href = '/login'; return }
-      setPatient(pat as Patient)
+      // Admin impersonation: if adminPatient is provided by the server wrapper
+      // (which used createAdminClient() to bypass RLS), use it directly and
+      // skip the client-side patient query entirely. This avoids the RLS block
+      // that would occur if we queried with the admin's anon-key session.
+      let pat: Patient
+      if (adminPatient) {
+        pat = adminPatient as Patient
+        setPatient(pat)
+      } else {
+        const { data: fetched, error: patErr } = await db
+          .from('patients')
+          .select('id, first_name, preferred_language, weight_kg, enrolled_at')
+          .eq('user_id', user.id)
+          .single()
+        if (patErr || !fetched) { window.location.href = '/login'; return }
+        pat = fetched as Patient
+        setPatient(pat)
+      }
 
       // Existing queries
       const { data: wLogs } = await db

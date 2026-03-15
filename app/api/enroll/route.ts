@@ -127,7 +127,16 @@ export async function POST(request: Request) {
     if (authError || !user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
-    clinicId = user.id
+    // Look up clinic_id from user_roles — the authenticated user is a clinic
+    // staff member, and their clinic_id is stored in user_roles, not user.id.
+    const admin = createAdminClient()
+    const { data: roleRow } = await admin
+      .from('user_roles')
+      .select('clinic_id')
+      .eq('user_id', user.id)
+      .eq('role', 'clinic')
+      .single()
+    clinicId = roleRow?.clinic_id ?? user.id
   }
 
   // 2. Parse body

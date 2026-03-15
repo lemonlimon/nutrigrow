@@ -1,0 +1,3 @@
+-- 008_admin_rls.sql
+-- ALREADY APPLIED DIRECTLY IN SUPABASE DASHBOARD.
+-- This file is intentionally left empty to prevent re-application on future deploys.

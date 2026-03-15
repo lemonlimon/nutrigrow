@@ -16,6 +16,13 @@ export default async function PatientHomePage() {
 
   let adminPatientId:   string | null = null
   let adminPatientName: string | null = null
+  let adminPatient:     {
+    id:                 string
+    first_name:         string
+    preferred_language: string
+    weight_kg:          number
+    enrolled_at:        string
+  } | null = null
 
   if (adminCookie?.value) {
     // Verify the requesting user is actually an admin before trusting the cookie
@@ -31,17 +38,26 @@ export default async function PatientHomePage() {
 
       const isAdmin = (rolesData ?? []).some(r => r.role === 'admin')
       if (isAdmin) {
-        // Fetch the patient's name for the banner
+        // Fetch full patient object via admin client (bypasses RLS).
+        // Passing it to PatientHomeClient means the client skips its own
+        // anon-key patient query, which would be blocked by RLS.
         const { data: pat } = await admin
           .from('patients')
-          .select('first_name, last_name')
+          .select('id, first_name, last_name, preferred_language, weight_kg, enrolled_at')
           .eq('id', adminCookie.value)
           .single()
 
-        adminPatientId   = adminCookie.value
-        adminPatientName = pat
-          ? `${pat.first_name}${pat.last_name ? ' ' + pat.last_name : ''}`
-          : 'Patient'
+        if (pat) {
+          adminPatientId   = pat.id
+          adminPatientName = `${pat.first_name}${pat.last_name ? ' ' + pat.last_name : ''}`
+          adminPatient     = {
+            id:                 pat.id,
+            first_name:         pat.first_name,
+            preferred_language: pat.preferred_language ?? 'en',
+            weight_kg:          pat.weight_kg,
+            enrolled_at:        pat.enrolled_at,
+          }
+        }
       }
     }
   }
@@ -52,6 +68,7 @@ export default async function PatientHomePage() {
       <PatientHomeClient
         adminPatientId={adminPatientId}
         adminPatientName={adminPatientName}
+        adminPatient={adminPatient}
       />
     </>
   )

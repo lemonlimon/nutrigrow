@@ -28,7 +28,11 @@ export default function LoginForm() {
     }
 
     // Role-based routing — window.location.href for a hard navigation
-    // so session cookies are fully committed before the next page loads
+    // so session cookies are fully committed before the next page loads.
+    // Rule: admin or clinic → /dashboard; everyone else → /patient/home.
+    // We intentionally avoid querying the patients table here because RLS
+    // can block the read (e.g. user_id NULL for legacy enrolled patients),
+    // and the old fallback to /dashboard caused a redirect loop for patients.
     const userId = authData.user?.id
     if (userId) {
       const { data: rolesData } = await supabase
@@ -44,25 +48,10 @@ export default function LoginForm() {
         window.location.href = '/dashboard'
         return
       }
-
-      // No admin/clinic role — check if they have a patient record
-      const { data: patientRecord } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('user_id', userId)
-        .single()
-
-      if (patientRecord) {
-        window.location.href = '/patient/home'
-        return
-      }
-
-      // Absolute fallback — send to dashboard rather than looping to /login
-      window.location.href = '/dashboard'
-      return
     }
 
-    window.location.href = '/dashboard'
+    // Default: patients, unassigned users, and any role not handled above
+    window.location.href = '/patient/home'
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────

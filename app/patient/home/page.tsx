@@ -379,18 +379,75 @@ function MealScoreBar({ score }: { score: number }) {
   )
 }
 
+// ── Donut Ring ────────────────────────────────────────────────────────────────
+function DonutRing({
+  value, goal, color, emoji,
+}: {
+  value: number
+  goal:  number
+  color: string
+  emoji: string
+}) {
+  const R            = 50
+  const SIZE         = 120
+  const circumference = 2 * Math.PI * R
+  const pct          = Math.min(value / goal, 1)
+  const offset       = circumference * (1 - pct)
+  return (
+    <svg
+      width={SIZE}
+      height={SIZE}
+      viewBox={`0 0 ${SIZE} ${SIZE}`}
+      style={{ display: 'block' }}
+      aria-hidden="true"
+    >
+      {/* Track */}
+      <circle
+        r={R} cx={SIZE / 2} cy={SIZE / 2}
+        fill="none"
+        stroke="#F0F0F0"
+        strokeWidth="10"
+      />
+      {/* Fill */}
+      <circle
+        r={R} cx={SIZE / 2} cy={SIZE / 2}
+        fill="none"
+        stroke={color}
+        strokeWidth="10"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+      />
+      {/* Center emoji */}
+      <text
+        x={SIZE / 2} y={SIZE / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize="24"
+      >
+        {emoji}
+      </text>
+    </svg>
+  )
+}
+
 // ── Hero Dashboard ────────────────────────────────────────────────────────────
 function HeroDashboard({
-  calLow, waterMl, weightDeltaKg,
+  calLow, waterMl, weightDeltaKg, enrolledAt,
   onCalTap, onWaterTap, onWeightTap,
 }: {
   calLow:         number
   waterMl:        number
   weightDeltaKg:  number | null
+  enrolledAt:     string
   onCalTap:    () => void
   onWaterTap:  () => void
   onWeightTap: () => void
 }) {
+  const calColor = calLow > 1800 ? '#C0392B' : '#1D9E75'
+
   const weightLabel =
     weightDeltaKg === null ? '—'
     : weightDeltaKg === 0  ? '0 kg'
@@ -402,67 +459,113 @@ function HeroDashboard({
     : weightDeltaKg > 0    ? '#C0392B'
     :                        '#999'
 
-  const calPct   = Math.round(calLow   / 1800 * 100)
-  const waterPct = Math.round(waterMl  / 2000 * 100)
-
-  const cards = [
-    {
-      icon:    '🔥',
-      value:   calLow > 0 ? `${calPct}%` : '—',
-      label:   'Today',
-      onTap:   onCalTap,
-      color:   calLow <= 0 ? '#BBB' : calLow > 1800 ? '#C0392B' : '#1D9E75',
-    },
-    {
-      icon:    '💧',
-      value:   waterMl > 0 ? `${waterPct}%` : '—',
-      label:   'Water',
-      onTap:   onWaterTap,
-      color:   waterMl > 0 ? '#1D9E75' : '#BBB',
-    },
-    {
-      icon:    '⚖️',
-      value:   weightLabel,
-      label:   'On program',
-      onTap:   onWeightTap,
-      color:   weightColor,
-    },
-  ]
+  const sinceLabel = new Date(enrolledAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day:   'numeric',
+  })
 
   return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      {cards.map(({ icon, value, label, onTap, color }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* ── Top row: calories + water donut cards ── */}
+      <div style={{ display: 'flex', gap: 12 }}>
+
+        {/* Calories card */}
         <button
-          key={label}
           type="button"
-          onClick={onTap}
+          onClick={onCalTap}
           style={{
-            flex:          1,
-            background:    '#fff',
-            borderRadius:  16,
-            boxShadow:     '0 1px 4px rgba(0,0,0,0.06)',
-            border:        '1px solid #F0F0F0',
-            padding:       '14px 10px',
-            textAlign:     'center',
-            cursor:        'pointer',
-            minWidth:      0,
+            flex:           1,
+            background:     '#fff',
+            borderRadius:   16,
+            border:         '1px solid #F0F0F0',
+            padding:        '20px 12px',
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            cursor:         'pointer',
+            minWidth:       0,
           }}
         >
-          <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-          <div
+          <DonutRing value={calLow} goal={1800} color={calColor} emoji="🔥" />
+          <p
             className="font-dm-sans font-bold"
-            style={{ fontSize: 15, color, lineHeight: 1.2, wordBreak: 'break-word' }}
+            style={{ fontSize: 28, color: '#1A1A1A', margin: '10px 0 0', lineHeight: 1 }}
           >
-            {value}
-          </div>
-          <div
-            className="font-dm-sans uppercase"
-            style={{ fontSize: 10, color: '#999', letterSpacing: '0.06em', marginTop: 4 }}
+            {calLow > 0 ? calLow.toLocaleString() : '0'}
+          </p>
+          <p
+            className="font-dm-sans"
+            style={{ fontSize: 12, color: '#999', marginTop: 4 }}
           >
-            {label}
-          </div>
+            / 1,800 kcal
+          </p>
         </button>
-      ))}
+
+        {/* Water card */}
+        <button
+          type="button"
+          onClick={onWaterTap}
+          style={{
+            flex:           1,
+            background:     '#fff',
+            borderRadius:   16,
+            border:         '1px solid #F0F0F0',
+            padding:        '20px 12px',
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            cursor:         'pointer',
+            minWidth:       0,
+          }}
+        >
+          <DonutRing value={waterMl} goal={2000} color="#3B82F6" emoji="💧" />
+          <p
+            className="font-dm-sans font-bold"
+            style={{ fontSize: 28, color: '#1A1A1A', margin: '10px 0 0', lineHeight: 1 }}
+          >
+            {waterMl > 0 ? waterMl.toLocaleString() : '0'} ml
+          </p>
+          <p
+            className="font-dm-sans"
+            style={{ fontSize: 12, color: '#999', marginTop: 4 }}
+          >
+            / 2,000 ml goal
+          </p>
+        </button>
+
+      </div>
+
+      {/* ── Weight stat bar ── */}
+      <button
+        type="button"
+        onClick={onWeightTap}
+        style={{
+          background:     '#fff',
+          borderRadius:   12,
+          border:         '1px solid #F0F0F0',
+          padding:        '12px 16px',
+          display:        'flex',
+          justifyContent: 'space-between',
+          alignItems:     'center',
+          cursor:         'pointer',
+          width:          '100%',
+        }}
+      >
+        <span
+          className="font-dm-sans font-semibold"
+          style={{ fontSize: 14, color: weightColor }}
+        >
+          ⚖️ {weightLabel} on program
+        </span>
+        <span
+          className="font-dm-sans"
+          style={{ fontSize: 12, color: '#999' }}
+        >
+          Since {sinceLabel}
+        </span>
+      </button>
+
     </div>
   )
 }
@@ -1443,6 +1546,7 @@ export default function PatientHomePage() {
         calLow={todayCalories?.low ?? 0}
         waterMl={waterMl}
         weightDeltaKg={weightDelta}
+        enrolledAt={patient.enrolled_at}
         onCalTap={() => scrollTo(foodRef)}
         onWaterTap={() => scrollTo(waterRef)}
         onWeightTap={() => scrollTo(weightRef)}

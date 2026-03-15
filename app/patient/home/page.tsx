@@ -440,14 +440,20 @@ function WeightSection({
   )
 }
 
-// ── Feature 2: Daily food photo ───────────────────────────────────────────────
-function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
+// ── Feature 2: Daily food photo (confirm/retake flow) ─────────────────────────
+function FoodSection({
+  patient, isAr, onConfirmed,
+}: {
+  patient:     Patient
+  isAr:        boolean
+  onConfirmed: (meal: FoodLog, calLow: number, calHigh: number) => void
+}) {
   const t       = T[isAr ? 'ar' : 'en']
   const fileRef = useRef<HTMLInputElement>(null)
 
-  type FoodState = 'idle' | 'analyzing' | 'done' | 'error'
+  type FoodState = 'idle' | 'analyzing' | 'pending' | 'confirming' | 'done' | 'error'
   const [state,         setState]        = useState<FoodState>('idle')
-  const [result,        setResult]       = useState<{
+  const [pendingResult, setPendingResult] = useState<{
     dish_name:              string
     tag:                    string
     note_en:                string
@@ -458,36 +464,74 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
     carbs_g?:                number
     fat_g?:                  number
   } | null>(null)
-  const [preview,       setPreview]      = useState<string | null>(null)
-  // Step 2A — meal type selector
-  const [mealType,      setMealType]     = useState<string | null>(null)
-  // Step 2B — optional food name hint
-  const [foodNameHint,  setFoodNameHint] = useState('')
+  const [preview,      setPreview]     = useState<string | null>(null)
+  const [mealType,     setMealType]    = useState<string | null>(null)
+  const [foodNameHint, setFoodNameHint] = useState('')
+  const [celebrating,  setCelebrating] = useState(false)
 
   const handleReset = () => {
     setState('idle')
     setPreview(null)
-    setResult(null)
+    setPendingResult(null)
     setMealType(null)
     setFoodNameHint('')
   }
 
-  // Step 3 — include mealType and foodNameHint in FormData
   const handleFile = async (file: File) => {
     setPreview(URL.createObjectURL(file))
     setState('analyzing')
-    setResult(null)
+    setPendingResult(null)
     const fd = new FormData()
     fd.append('image',     file)
     fd.append('patientId', patient.id)
-    if (mealType)                      fd.append('mealType',     mealType)
+    if (mealType)                       fd.append('mealType',     mealType)
     if (foodNameHint.trim().length > 0) fd.append('foodNameHint', sanitizeFoodName(foodNameHint))
     try {
-      const res  = await fetch('/api/food-log', { method: 'POST', body: fd })
+      const res  = await fetch('/api/food-log/analyze', { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok || !json.success) { setState('error'); return }
-      setResult(json.data)
+      setPendingResult(json.data)
+      setState('pending')
+    } catch {
+      setState('error')
+    }
+  }
+
+  const handleConfirm = async () => {
+    if (!pendingResult) return
+    setState('confirming')
+    try {
+      const res  = await fetch('/api/food-log/confirm', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ patientId: patient.id, analysis: pendingResult, mealType }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setState('error'); return }
+
+      const confirmedMeal: FoodLog = {
+        dish_name:              pendingResult.dish_name,
+        tag:                    pendingResult.tag,
+        note_en:                pendingResult.note_en,
+        calories_estimate_low:  pendingResult.calories_estimate_low  ?? null,
+        calories_estimate_high: pendingResult.calories_estimate_high ?? null,
+        protein_g:              pendingResult.protein_g ?? null,
+        carbs_g:                pendingResult.carbs_g   ?? null,
+        fat_g:                  pendingResult.fat_g     ?? null,
+        meal_type:              mealType ?? null,
+        logged_at:              new Date().toISOString(),
+      }
+      onConfirmed(
+        confirmedMeal,
+        pendingResult.calories_estimate_low  ?? 0,
+        pendingResult.calories_estimate_high ?? 0,
+      )
+      setCelebrating(true)
       setState('done')
+      setTimeout(() => {
+        setCelebrating(false)
+        handleReset()
+      }, 2200)
     } catch {
       setState('error')
     }
@@ -496,145 +540,283 @@ function FoodSection({ patient, isAr }: { patient: Patient; isAr: boolean }) {
   const sanitizedLen = sanitizeFoodName(foodNameHint).length
 
   return (
-    <Card>
-      <h2 className={`text-base font-semibold text-gray-900 mb-4 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-        {t.foodTitle}
-      </h2>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={e => {
-          const f = e.target.files?.[0]
-          if (f) handleFile(f)
-          e.target.value = ''
-        }}
-      />
-
-      {state === 'idle' && (
+    <>
+      {/* ── Celebration overlay ── */}
+      {celebrating && pendingResult && (
         <>
-          {/* Step 2A — Meal type selector */}
-          <div className={`flex gap-2 flex-wrap mb-3 ${isAr ? 'flex-row-reverse' : ''}`}>
-            {MEAL_TYPES.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMealType(prev => prev === value ? null : value)}
-                className="font-dm-sans transition-colors"
-                style={{
-                  fontSize:     13,
-                  padding:      '6px 16px',
-                  borderRadius: 20,
-                  border:       `1px solid ${mealType === value ? '#0D5C45' : '#e0e0e0'}`,
-                  background:   mealType === value ? '#0D5C45' : '#fff',
-                  color:        mealType === value ? '#fff'    : '#666',
-                  cursor:       'pointer',
-                }}
-              >
-                {label}
-              </button>
-            ))}
+          <style>{`
+            @keyframes mizanCelebrate {
+              0%  { opacity: 0; transform: scale(0.96); }
+              12% { opacity: 1; transform: scale(1);    }
+              80% { opacity: 1; transform: scale(1);    }
+              100%{ opacity: 0; transform: scale(1.02); }
+            }
+            .mizan-celebrate { animation: mizanCelebrate 2.2s ease-in-out forwards; }
+          `}</style>
+          <div
+            className="mizan-celebrate"
+            style={{
+              position:       'fixed',
+              inset:          0,
+              zIndex:         1000,
+              background:     'rgba(255,255,255,0.93)',
+              display:        'flex',
+              flexDirection:  'column',
+              alignItems:     'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: 64 }}>✨</span>
+            <p className="font-playfair"
+               style={{ fontSize: 24, color: '#0D5C45', marginTop: 16, textAlign: 'center' }}>
+              Meal logged!
+            </p>
+            <p className="font-dm-sans"
+               style={{ fontSize: 16, color: '#666', marginTop: 8, textAlign: 'center' }}>
+              {pendingResult.dish_name}
+            </p>
           </div>
-
-          {/* Step 2B — Optional food name hint */}
-          <div className="mb-3">
-            <input
-              type="text"
-              maxLength={120}
-              value={foodNameHint}
-              onChange={e => setFoodNameHint(sanitizeFoodName(e.target.value))}
-              placeholder="What did you eat? (optional)"
-              className="w-full font-dm-sans"
-              style={{
-                height:       44,
-                border:       '1px solid #e0e0e0',
-                borderRadius: 12,
-                padding:      '0 14px',
-                fontSize:     14,
-                color:        '#1a1a1a',
-                outline:      'none',
-                boxSizing:    'border-box',
-              }}
-              onFocus={e  => { e.currentTarget.style.borderColor = '#0D5C45' }}
-              onBlur={e   => { e.currentTarget.style.borderColor = '#e0e0e0' }}
-            />
-            {foodNameHint.length > 0 && (
-              <p className="font-dm-sans text-right mt-1"
-                 style={{ fontSize: 11, color: '#bbb' }}>
-                {sanitizedLen}/100
-              </p>
-            )}
-          </div>
-
-          {/* Photo upload button */}
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className={`w-full py-10 border-2 border-dashed border-gray-200 rounded-card
-                        text-gray-400 text-sm transition-colors hover:border-brand-mid hover:text-brand-mid
-                        cursor-pointer ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-            {t.foodTap}
-          </button>
         </>
       )}
 
-      {state === 'analyzing' && (
-        <div className="flex flex-col items-center gap-3 py-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {preview && <img src={preview} alt="" className="w-24 h-24 object-cover rounded-card opacity-60" />}
-          <p className={`text-sm text-gray-400 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>{t.foodAnalyzing}</p>
-        </div>
-      )}
+      <Card>
+        <h2 className={`text-base font-semibold text-gray-900 mb-4 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+          {t.foodTitle}
+        </h2>
 
-      {state === 'done' && result && (
-        <div className="space-y-3">
-          <div className="flex gap-3 items-start">
-            {preview && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview} alt={result.dish_name}
-                   className="w-16 h-16 object-cover rounded-btn flex-shrink-0" />
-            )}
-            <div className="space-y-1 flex-1">
-              <p className={`font-semibold text-gray-900 text-sm ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-                {result.dish_name}
-              </p>
-              <span className={`inline-block text-xs px-2.5 py-1 rounded-full border font-medium
-                               ${isAr ? 'font-tajawal' : 'font-dm-sans'} ${TAG_COLORS[result.tag] ?? TAG_COLORS.yellow}`}>
-                {t.tagLabels[result.tag as keyof typeof t.tagLabels] ?? result.tag}
-              </span>
-              <p className={`text-xs text-gray-500 leading-relaxed ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-                {isAr ? result.note_ar : result.note_en}
-              </p>
-              {result.calories_estimate_low != null && result.calories_estimate_high != null && (
-                <p className="mt-1.5 text-[13px] leading-snug" style={{ color: '#0D5C45' }}>
-                  <span className="font-dm-sans">~{result.calories_estimate_low}–{result.calories_estimate_high} kcal · </span>
-                  <span className="font-tajawal">سعرة حرارية تقريبية</span>
+        {/* Hidden file input — no capture= so iOS/Android shows full choice sheet */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0]
+            if (f) handleFile(f)
+            e.target.value = ''
+          }}
+        />
+
+        {/* ── IDLE ── */}
+        {state === 'idle' && (
+          <>
+            {/* Meal type selector */}
+            <div className={`flex gap-2 flex-wrap mb-3 ${isAr ? 'flex-row-reverse' : ''}`}>
+              {MEAL_TYPES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMealType(prev => prev === value ? null : value)}
+                  className="font-dm-sans transition-colors"
+                  style={{
+                    fontSize:     13,
+                    padding:      '6px 16px',
+                    borderRadius: 20,
+                    border:       `1px solid ${mealType === value ? '#0D5C45' : '#e0e0e0'}`,
+                    background:   mealType === value ? '#0D5C45' : '#fff',
+                    color:        mealType === value ? '#fff'    : '#666',
+                    cursor:       'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Food name hint */}
+            <div className="mb-4">
+              <input
+                type="text"
+                maxLength={120}
+                value={foodNameHint}
+                onChange={e => setFoodNameHint(sanitizeFoodName(e.target.value))}
+                placeholder="What did you eat? (optional)"
+                className="w-full font-dm-sans"
+                style={{
+                  height:       44,
+                  border:       '1px solid #e0e0e0',
+                  borderRadius: 12,
+                  padding:      '0 14px',
+                  fontSize:     14,
+                  color:        '#1a1a1a',
+                  outline:      'none',
+                  boxSizing:    'border-box',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#0D5C45' }}
+                onBlur={e  => { e.currentTarget.style.borderColor = '#e0e0e0' }}
+              />
+              {foodNameHint.length > 0 && (
+                <p className="font-dm-sans text-right mt-1" style={{ fontSize: 11, color: '#bbb' }}>
+                  {sanitizedLen}/100
                 </p>
               )}
-              <MacroPills protein_g={result.protein_g} carbs_g={result.carbs_g} fat_g={result.fat_g} />
             </div>
-          </div>
-          <button type="button"
-            onClick={handleReset}
-            className={`text-xs text-brand-mid underline cursor-pointer bg-transparent border-none p-0
-                        ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-            {t.foodRetry}
-          </button>
-        </div>
-      )}
 
-      {state === 'error' && (
-        <div className="space-y-3">
-          <p className={`text-sm text-red-700 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>{t.errorSave}</p>
-          <button type="button" onClick={handleReset}
-            className={`text-xs text-brand-mid underline cursor-pointer bg-transparent border-none p-0
-                        ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
-            {t.foodRetry}
-          </button>
-        </div>
-      )}
-    </Card>
+            {/* 📸 Log a Meal button */}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className={`w-full font-dm-sans font-bold flex items-center justify-center gap-2
+                          transition-opacity hover:opacity-90 cursor-pointer
+                          ${isAr ? 'flex-row-reverse' : ''}`}
+              style={{
+                height:       56,
+                background:   '#0D5C45',
+                color:        '#fff',
+                fontSize:     18,
+                borderRadius: 16,
+                border:       'none',
+              }}
+            >
+              <span>📸</span>
+              <span>{isAr ? 'سجّل وجبة' : 'Log a Meal'}</span>
+            </button>
+          </>
+        )}
+
+        {/* ── ANALYZING — full-width photo + spinner overlay ── */}
+        {state === 'analyzing' && (
+          <div className="relative">
+            {preview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview}
+                alt=""
+                className="w-full object-cover"
+                style={{ borderRadius: 16, maxHeight: 240, display: 'block' }}
+              />
+            )}
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+              style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16 }}
+            >
+              <div style={{
+                width:          28,
+                height:         28,
+                border:         '3px solid #E8F5F0',
+                borderTopColor: '#1D9E75',
+                borderRadius:   '50%',
+                animation:      'spin 0.9s linear infinite',
+              }} />
+              <p className="font-dm-sans" style={{ fontSize: 13, color: '#666' }}>
+                {t.foodAnalyzing}
+              </p>
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
+        {/* ── PENDING / CONFIRMING — dashed card with confirm + retake ── */}
+        {(state === 'pending' || state === 'confirming') && pendingResult && (
+          <div style={{ border: '1.5px dashed #DDD', borderRadius: 12, padding: '16px 16px 14px' }}>
+            {/* "Does this look right?" banner */}
+            <p className="font-dm-sans"
+               style={{ fontSize: 12, color: '#999', fontStyle: 'italic', marginBottom: 12 }}>
+              Does this look right?
+            </p>
+
+            {/* Thumbnail + result info */}
+            <div className="flex gap-3 items-start mb-4">
+              {preview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={preview}
+                  alt={pendingResult.dish_name}
+                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }}
+                />
+              )}
+              <div className="space-y-1 flex-1 min-w-0">
+                <p className={`font-semibold text-gray-900 text-sm ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+                  {pendingResult.dish_name}
+                </p>
+                <span className={`inline-block text-xs px-2.5 py-1 rounded-full border font-medium
+                                 ${isAr ? 'font-tajawal' : 'font-dm-sans'}
+                                 ${TAG_COLORS[pendingResult.tag] ?? TAG_COLORS.yellow}`}>
+                  {t.tagLabels[pendingResult.tag as keyof typeof t.tagLabels] ?? pendingResult.tag}
+                </span>
+                <p className={`text-xs text-gray-500 leading-relaxed ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+                  {isAr ? pendingResult.note_ar : pendingResult.note_en}
+                </p>
+                {pendingResult.calories_estimate_low != null && pendingResult.calories_estimate_high != null && (
+                  <p className="mt-1 text-[13px] leading-snug" style={{ color: '#0D5C45' }}>
+                    <span className="font-dm-sans">
+                      ~{pendingResult.calories_estimate_low}–{pendingResult.calories_estimate_high} kcal ·{' '}
+                    </span>
+                    <span className="font-tajawal">سعرة حرارية تقريبية</span>
+                  </p>
+                )}
+                <MacroPills
+                  protein_g={pendingResult.protein_g}
+                  carbs_g={pendingResult.carbs_g}
+                  fat_g={pendingResult.fat_g}
+                />
+              </div>
+            </div>
+
+            {/* Confirm button */}
+            <button
+              type="button"
+              disabled={state === 'confirming'}
+              onClick={handleConfirm}
+              className="w-full font-dm-sans font-semibold transition-opacity"
+              style={{
+                height:       48,
+                background:   state === 'confirming' ? '#1D9E75' : '#0D5C45',
+                color:        '#fff',
+                fontSize:     15,
+                borderRadius: 12,
+                border:       'none',
+                cursor:       state === 'confirming' ? 'not-allowed' : 'pointer',
+                marginBottom: 10,
+                opacity:      state === 'confirming' ? 0.8 : 1,
+              }}
+            >
+              {state === 'confirming' ? 'Saving…' : "✓ Yes, that's right"}
+            </button>
+
+            {/* Retake button */}
+            <button
+              type="button"
+              disabled={state === 'confirming'}
+              onClick={handleReset}
+              className="w-full font-dm-sans transition-opacity"
+              style={{
+                height:       48,
+                background:   '#F5F5F5',
+                color:        '#666',
+                fontSize:     15,
+                borderRadius: 12,
+                border:       'none',
+                cursor:       state === 'confirming' ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ↩ Retake photo
+            </button>
+          </div>
+        )}
+
+        {/* ── DONE — brief logged state while celebration plays ── */}
+        {state === 'done' && (
+          <div className="flex items-center justify-center py-6">
+            <p className="font-dm-sans" style={{ fontSize: 14, color: '#1D9E75' }}>
+              ✓ Logged!
+            </p>
+          </div>
+        )}
+
+        {/* ── ERROR ── */}
+        {state === 'error' && (
+          <div className="space-y-3">
+            <p className={`text-sm text-red-700 ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>{t.errorSave}</p>
+            <button type="button" onClick={handleReset}
+              className={`text-xs text-brand-mid underline cursor-pointer bg-transparent border-none p-0
+                          ${isAr ? 'font-tajawal' : 'font-dm-sans'}`}>
+              {t.foodRetry}
+            </button>
+          </div>
+        )}
+      </Card>
+    </>
   )
 }
 
@@ -1012,7 +1194,17 @@ export default function PatientHomePage() {
         mealCount={todayCalories?.mealCount ?? 0}
       />
 
-      <FoodSection patient={patient} isAr={isAr} />
+      <FoodSection
+        patient={patient}
+        isAr={isAr}
+        onConfirmed={(meal, calLow, calHigh) => {
+          setLastMeal(meal)
+          setTodayCalories(prev => prev
+            ? { low: prev.low + calLow, high: prev.high + calHigh, mealCount: prev.mealCount + 1 }
+            : { low: calLow, high: calHigh, mealCount: 1 }
+          )
+        }}
+      />
 
       {/* Feature 1: last meal card — only shown if a food log exists */}
       {lastMeal && <LastMealSection lastMeal={lastMeal} isAr={isAr} />}

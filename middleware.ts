@@ -22,7 +22,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ── 2. Create Supabase client to check session ──
+  // ── 2. Create Supabase client with PROPER cookie threading ──
+  // Per @supabase/ssr docs: setAll must update BOTH request cookies
+  // AND the response cookies so the refreshed session is persisted.
+  // An empty setAll means every getUser() call "refreshes" in memory
+  // but never commits — so middleware sees null user on every request.
+  let response = NextResponse.next({ request })
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,24 +37,37 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(_cookiesToSet) {
-          // middleware can't set cookies directly,
-          // handled by response below
+        setAll(cookiesToSet) {
+          // Step 1: apply to the request so subsequent getAll() calls see them
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          // Step 2: create new response that carries the updated cookies
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use getSession() instead of getUser() in middleware.
+  // getUser() makes a live network call to Supabase which can silently
+  // fail in Next.js Edge Runtime. getSession() decodes the JWT from the
+  // cookie directly — no network call, works reliably in Edge Runtime.
+  // Routing decisions here are safe; all data access is still
+  // protected by Supabase RLS policies.
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   // ── 3. Not logged in — send to /login ──
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // ── 4. Logged in — check role for routing ──
-  // Only check role for paths that need it
-  // Use try/catch so a DB error never locks users out
+  // ── 4. Logged in — role-based routing ──
+  // Wrapped in try/catch: a DB error must NEVER lock users out.
   try {
     const { data: roles } = await supabase
       .from('user_roles')
@@ -59,27 +78,23 @@ export async function middleware(request: NextRequest) {
     const isClinic  = roles?.some(r => r.role === 'clinic')
     const isPatient = roles?.some(r => r.role === 'patient')
 
-    // Admin can go anywhere — never redirect admin
+    // Admin goes anywhere — never redirect admin
     if (isAdmin) {
-      return NextResponse.next()
+      return response
     }
 
     // Clinic staff trying to access patient routes
     if (isClinic && pathname.startsWith('/patient')) {
-      return NextResponse.redirect(
-        new URL('/dashboard', request.url)
-      )
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Patient trying to access clinic routes
+    // Patient trying to access clinic/admin routes
     if (isPatient && (
       pathname.startsWith('/dashboard') ||
       pathname.startsWith('/patients') ||
       pathname.startsWith('/admin')
     )) {
-      return NextResponse.redirect(
-        new URL('/patient/home', request.url)
-      )
+      return NextResponse.redirect(new URL('/patient/home', request.url))
     }
 
     // No role in user_roles — check patients table
@@ -90,7 +105,6 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/patients') ||
         pathname.startsWith('/admin')
       ) {
-        // Check if they're a patient
         const { data: patientRecord } = await supabase
           .from('patients')
           .select('id')
@@ -98,26 +112,24 @@ export async function middleware(request: NextRequest) {
           .single()
 
         if (patientRecord) {
-          // They're a patient, redirect away from clinic routes
-          return NextResponse.redirect(
-            new URL('/patient/home', request.url)
-          )
+          return NextResponse.redirect(new URL('/patient/home', request.url))
         }
 
-        // Unknown user — send to login
-        return NextResponse.redirect(
-          new URL('/login', request.url)
-        )
+        // Unknown role and no patient record — let them through rather than
+        // creating a redirect loop. The page itself will handle auth errors.
+        return response
       }
     }
-  } catch (error) {
-    // If ANY error in role check, let them through
-    // Better to allow access than lock everyone out
-    console.error('Middleware role check error:', error)
-    return NextResponse.next()
+  } catch (err) {
+    // If ANY error in role check, let them through — errors must never
+    // lock users out.
+    console.error('[Middleware] Role check error:', err)
+    return response
   }
 
-  return NextResponse.next()
+  // Return the response object so any session cookies set by setAll
+  // are actually sent back to the browser.
+  return response
 }
 
 export const config = {

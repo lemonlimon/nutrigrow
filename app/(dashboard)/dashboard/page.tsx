@@ -88,20 +88,27 @@ export default async function DashboardPage({
   const admin = createAdminClient()
 
   // ── Role lookup ───────────────────────────────────────────────────────────
-  const { data: roleData } = await admin
+  // Use array (no .single()) — a user can have multiple rows in user_roles
+  // (e.g. admin + clinic). .single() throws when >1 row matches, which
+  // caused admins with two roles to always get redirect('/login').
+  const { data: rolesData } = await admin
     .from('user_roles')
     .select('role, clinic_id')
     .eq('user_id', user.id)
-    .single()
 
-  const isAdmin = roleData?.role === 'admin'
+  const roles    = rolesData ?? []
+  const isAdmin  = roles.some(r => r.role === 'admin')
+  const clinicRow = roles.find(r => r.role === 'clinic')
+
   const requestedClinic = typeof searchParams?.clinic === 'string'
     ? searchParams.clinic
     : undefined
 
+  // Admins: use URL param if present, else the DEFAULT_CLINIC constant
+  // Clinic staff: use their assigned clinic_id
   const clinicId = isAdmin
     ? (requestedClinic ?? DEFAULT_CLINIC)
-    : roleData?.clinic_id
+    : clinicRow?.clinic_id
 
   if (!clinicId) redirect('/login')
 

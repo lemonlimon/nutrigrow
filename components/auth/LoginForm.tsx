@@ -15,8 +15,9 @@ export default function LoginForm() {
     setError(null)
 
     const supabase = createClient()
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email:    email.trim(),
       password,
     })
 
@@ -30,21 +31,38 @@ export default function LoginForm() {
     // so session cookies are fully committed before the next page loads
     const userId = authData.user?.id
     if (userId) {
-      const { data: roles } = await supabase
+      const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
 
-      const isAdmin  = roles?.some(r => r.role === 'admin')
-      const isClinic = roles?.some(r => r.role === 'clinic')
+      const roles    = rolesData ?? []
+      const isAdmin  = roles.some(r => r.role === 'admin')
+      const isClinic = roles.some(r => r.role === 'clinic')
 
       if (isAdmin || isClinic) {
         window.location.href = '/dashboard'
         return
       }
+
+      // No admin/clinic role — check if they have a patient record
+      const { data: patientRecord } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('user_id', userId)
+        .single()
+
+      if (patientRecord) {
+        window.location.href = '/patient/home'
+        return
+      }
+
+      // Absolute fallback — send to dashboard rather than looping to /login
+      window.location.href = '/dashboard'
+      return
     }
 
-    window.location.href = '/patient/home'
+    window.location.href = '/dashboard'
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────
@@ -139,7 +157,7 @@ export default function LoginForm() {
         {loading ? 'Signing in…' : 'Sign In'}
       </button>
 
-      {/* Error — shown below button */}
+      {/* Error */}
       {error && (
         <p
           style={{
@@ -152,7 +170,6 @@ export default function LoginForm() {
           {error}
         </p>
       )}
-
 
     </form>
   )

@@ -51,20 +51,23 @@ export default async function PatientsPage({
   const admin = createAdminClient()
 
   // ── Role lookup ───────────────────────────────────────────────────────────
-  const { data: roleData } = await admin
+  // Use array (no .single()) — a user can have multiple rows in user_roles.
+  const { data: rolesData } = await admin
     .from('user_roles')
     .select('role, clinic_id')
     .eq('user_id', user.id)
-    .single()
 
-  const isAdmin = roleData?.role === 'admin'
+  const roles     = rolesData ?? []
+  const isAdmin   = roles.some(r => r.role === 'admin')
+  const clinicRow = roles.find(r => r.role === 'clinic')
+
   const requestedClinic = typeof searchParams?.clinic === 'string'
     ? searchParams.clinic
     : undefined
 
   const clinicId = isAdmin
     ? (requestedClinic ?? DEFAULT_CLINIC)
-    : roleData?.clinic_id
+    : clinicRow?.clinic_id
 
   if (!clinicId) redirect('/login')
 

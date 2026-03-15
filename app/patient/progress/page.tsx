@@ -23,14 +23,6 @@ interface Patient {
 
 interface WeightLog { weight_kg: number; logged_at: string }
 
-interface FoodLogRow {
-  calories_estimate_low?:  number | null
-  calories_estimate_high?: number | null
-  protein_g?:              number | null
-  carbs_g?:                number | null
-  fat_g?:                  number | null
-  logged_at:               string
-}
 
 interface WeeklyAvg {
   calories: number

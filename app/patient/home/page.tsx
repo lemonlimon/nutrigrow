@@ -263,6 +263,7 @@ function TipCard({ tip, isAr }: { tip: DailyTip; isAr: boolean }) {
         padding:      '20px 24px',
         textAlign:    'left',
         border:       '1px solid #E8F5F0',
+        borderLeft:   '3px solid #F5A623',
         cursor:       'pointer',
         display:      'block',
       }}
@@ -329,22 +330,22 @@ function MacroPills({
 }) {
   if (protein_g == null || carbs_g == null || fat_g == null) return null
   const pills = [
-    { emoji: '🥩', label: `${protein_g}g protein` },
-    { emoji: '🌾', label: `${carbs_g}g carbs`   },
-    { emoji: '🫒', label: `${fat_g}g fat`        },
+    { emoji: '🥩', label: `${protein_g}g protein`, bg: '#FFF0EB', color: '#E8623A' },
+    { emoji: '🌾', label: `${carbs_g}g carbs`,     bg: '#FFF8EB', color: '#D4860A' },
+    { emoji: '🫒', label: `${fat_g}g fat`,          bg: '#F0FAF5', color: '#1D9E75' },
   ]
   return (
     <div className="flex gap-2 flex-wrap mt-1.5">
-      {pills.map(({ emoji, label }) => (
+      {pills.map(({ emoji, label, bg, color }) => (
         <span
           key={label}
           className="font-dm-sans"
           style={{
-            background:   '#F5F5F5',
+            background:   bg,
             borderRadius: 8,
             padding:      '4px 10px',
             fontSize:     12,
-            color:        '#666',
+            color,
           }}
         >
           {emoji} {label}
@@ -359,7 +360,7 @@ function MealScoreBar({ score }: { score: number }) {
   const color =
     score >= 7 ? '#1D9E75'
     : score >= 4 ? '#F5A623'
-    :               '#C0392B'
+    :               '#E8623A'
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -446,7 +447,7 @@ function HeroDashboard({
   onWaterTap:  () => void
   onWeightTap: () => void
 }) {
-  const calColor = calLow > 1800 ? '#C0392B' : '#1D9E75'
+  const calColor = calLow > 1800 ? '#E8623A' : '#1D9E75'
 
   const weightLabel =
     weightDeltaKg === null ? '—'
@@ -456,7 +457,7 @@ function HeroDashboard({
   const weightColor =
     weightDeltaKg === null ? '#999'
     : weightDeltaKg < 0    ? '#1D9E75'
-    : weightDeltaKg > 0    ? '#C0392B'
+    : weightDeltaKg > 0    ? '#E8623A'
     :                        '#999'
 
   const sinceLabel = new Date(enrolledAt).toLocaleDateString('en-US', {
@@ -630,7 +631,7 @@ function WeightSection({
             const delta = prev != null ? log.weight_kg - prev.weight_kg : null
             const deltaColor =
               delta == null || delta === 0 ? '#999'
-              : delta > 0 ? '#B94040'
+              : delta > 0 ? '#E8623A'
               : '#1D9E75'
             const deltaLabel =
               delta == null  ? '—'
@@ -1246,8 +1247,8 @@ function CalorieRingCard({
   const isOverGoal  = consumed > CALORIE_GOAL
   const diff        = Math.abs(consumed - CALORIE_GOAL)
   const offset      = RING_CIRC * (1 - pct / 100)
-  const ringColor   = isOverGoal ? '#C0392B' : '#1D9E75'
-  const calColor    = isOverGoal ? '#C0392B' : '#0D5C45'
+  const ringColor   = isOverGoal ? '#E8623A' : '#1D9E75'
+  const calColor    = isOverGoal ? '#E8623A' : '#0D5C45'
 
   const MACROS = [
     { emoji: '🥩', label: 'Protein', value: proteinG },
@@ -1370,10 +1371,9 @@ function CalorieRingCard({
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const
 
 function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
-  const today     = new Date()
-  const todayStr  = today.toDateString()
+  const today    = new Date()
+  const todayStr = today.toDateString()
 
-  // Build Sun–Sat of current week
   const weekStart = new Date(today)
   weekStart.setDate(today.getDate() - today.getDay())
   weekStart.setHours(0, 0, 0, 0)
@@ -1387,65 +1387,84 @@ function DateStrip({ loggedDates }: { loggedDates: Set<string> }) {
   return (
     <div
       style={{
-        position:     'sticky',
-        top:          0,
-        zIndex:       10,
-        background:   '#FFFFFF',
-        borderBottom: '1px solid #F0F0F0',
-        padding:      '12px 16px',
-        display:      'flex',
+        position:       'sticky',
+        top:            52,
+        zIndex:         40,
+        background:     '#F2F2F7',
+        padding:        '10px 16px 14px',
+        display:        'flex',
         justifyContent: 'space-around',
       }}
     >
       {days.map((d, i) => {
-        const dStr    = d.toDateString()
+        const dStr     = d.toDateString()
         const isToday  = dStr === todayStr
         const isFuture = d > today && !isToday
         const hasLog   = loggedDates.has(dStr)
         const isPast   = !isToday && !isFuture
 
-        const numColor = isToday ? '#FFFFFF' : hasLog ? '#1D9E75' : '#CCC'
+        // Circle appearance
+        const circleBg: string =
+          isToday ? '#0D5C45' :
+          isFuture ? 'transparent' :
+          'white'
+        const circleBorder: string =
+          isToday && hasLog ? '3px solid #1D9E75' :
+          isToday           ? 'none' :
+          hasLog            ? '2px solid #1D9E75' :
+          isFuture          ? '1.5px solid #EEEEEE' :
+                              '1.5px solid #E0E0E0'
+        const numColor = isToday ? 'white' : hasLog ? '#1D9E75' : '#CCC'
+        const numBold  = isToday || hasLog
+
+        // Dot appearance
+        const showDot   = (isToday && hasLog) || isPast
+        const dotBg     = hasLog ? (isToday ? 'white' : '#1D9E75') : 'transparent'
+        const dotBorder = isPast && !hasLog ? '1px solid #CCC' : 'none'
 
         return (
           <div
             key={i}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40 }}
           >
-            {/* Day letter */}
             <span
               className="font-dm-sans"
-              style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', lineHeight: 1.4 }}
+              style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', marginBottom: 6, lineHeight: 1 }}
             >
               {DAY_LETTERS[i]}
             </span>
 
-            {/* Day number — circle for today or logged days */}
             <div
               style={{
-                width:          36,
-                height:         36,
+                width:          40,
+                height:         40,
                 borderRadius:   '50%',
                 display:        'flex',
                 alignItems:     'center',
                 justifyContent: 'center',
-                background:     isToday ? '#0D5C45' : 'transparent',
-                border:         hasLog && !isToday ? '2px solid #1D9E75' : '2px solid transparent',
+                background:     circleBg,
+                border:         circleBorder,
+                boxSizing:      'border-box',
               }}
             >
-              <span className="font-dm-sans" style={{ fontSize: 14, color: numColor }}>
+              <span
+                className="font-dm-sans"
+                style={{ fontSize: 14, color: numColor, fontWeight: numBold ? 700 : 400 }}
+              >
                 {d.getDate()}
               </span>
             </div>
 
-            {/* Activity dot */}
+            {/* Consistent dot row — keeps spacing uniform */}
             <div
               style={{
-                width:        4,
-                height:       4,
+                width:        3,
+                height:       3,
                 borderRadius: '50%',
-                marginTop:    3,
-                background:   hasLog ? '#1D9E75' : 'transparent',
-                border:       isPast && !hasLog ? '1px solid #CCC' : 'none',
+                marginTop:    4,
+                background:   showDot ? dotBg : 'transparent',
+                border:       showDot ? dotBorder : 'none',
+                boxSizing:    'border-box',
               }}
             />
           </div>
@@ -1649,12 +1668,33 @@ export default function PatientHomePage() {
 
   return (
     <>
-    <Shell isAr={isAr}>
+    {/* ── Sticky app header ── */}
+    <div
+      style={{
+        position:       'sticky',
+        top:            0,
+        zIndex:         50,
+        height:         52,
+        background:     '#FAFAF8',
+        borderBottom:   '1px solid #F0F0F0',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        padding:        '0 20px',
+      }}
+    >
+      <span className="font-tajawal" style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1 }}>
+        ميزان
+      </span>
+      <span className="font-playfair" style={{ fontSize: 16, letterSpacing: '0.12em', color: '#1A1A1A' }}>
+        MIZAN
+      </span>
+    </div>
 
-      {/* ── Calendar Date Strip — full-width, sticky ── */}
-      <div style={{ margin: '0 -16px' }}>
-        <DateStrip loggedDates={loggedDates} />
-      </div>
+    {/* ── Calendar Date Strip — full-width, sticky below header ── */}
+    <DateStrip loggedDates={loggedDates} />
+
+    <Shell isAr={isAr}>
 
       {/* Greeting + streak */}
       <div className="px-1">
@@ -1754,48 +1794,75 @@ export default function PatientHomePage() {
 
     {/* ── Floating Camera FAB ── */}
     <style>{`
-      @keyframes pulse-ring {
-        0%   { box-shadow: 0 0 0 0 rgba(26,26,26,0.3); }
-        70%  { box-shadow: 0 0 0 10px rgba(26,26,26,0); }
-        100% { box-shadow: 0 0 0 0 rgba(26,26,26,0); }
+      @keyframes breathe {
+        0%, 100% { transform: scale(1); }
+        50%       { transform: scale(1.1); }
       }
-      .mizan-fab { transition: transform 150ms ease; }
-      .mizan-fab:hover, .mizan-fab:active { transform: scale(1.08); }
+      @keyframes twinkle {
+        0%, 100% { opacity: 0; transform: scale(0.5); }
+        50%       { opacity: 1; transform: scale(1); }
+      }
+      .mizan-fab:hover, .mizan-fab:active { transform: scale(1.08) !important; }
     `}</style>
-    <button
-      type="button"
-      onClick={() => triggerFoodPickRef.current?.()}
-      className="mizan-fab"
-      aria-label="Log a meal"
-      style={{
-        position:       'fixed',
-        bottom:         88,
-        right:          20,
-        width:          60,
-        height:         60,
-        borderRadius:   '50%',
-        background:     '#1A1A1A',
-        border:         'none',
-        boxShadow:      '0 4px 16px rgba(0,0,0,0.25)',
-        animation:      (todayCalories?.mealCount ?? 0) > 0
-          ? undefined
-          : 'pulse-ring 2.5s ease infinite',
-        cursor:         'pointer',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        zIndex:         100,
-      }}
-    >
-      <svg
-        width="26" height="26" viewBox="0 0 24 24"
-        fill="none" stroke="white" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
+    <div style={{ position: 'fixed', bottom: 88, right: 20, zIndex: 100 }}>
+      {/* Sparkle stars — visible only when no meals logged today */}
+      {(todayCalories?.mealCount ?? 0) === 0 && (
+        <>
+          <span style={{
+            position: 'absolute', top: -6, right: -4,
+            fontSize: 8, color: '#F5A623', lineHeight: 1,
+            animation: 'twinkle 2s ease-in-out infinite',
+            animationDelay: '0s',
+            pointerEvents: 'none',
+          }}>✦</span>
+          <span style={{
+            position: 'absolute', top: -2, left: -8,
+            fontSize: 6, color: 'white', lineHeight: 1,
+            animation: 'twinkle 2s ease-in-out infinite',
+            animationDelay: '0.9s',
+            pointerEvents: 'none',
+          }}>✦</span>
+          <span style={{
+            position: 'absolute', bottom: -6, right: -2,
+            fontSize: 7, color: '#1D9E75', lineHeight: 1,
+            animation: 'twinkle 2s ease-in-out infinite',
+            animationDelay: '1.7s',
+            pointerEvents: 'none',
+          }}>✦</span>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={() => triggerFoodPickRef.current?.()}
+        className="mizan-fab"
+        aria-label="Log a meal"
+        style={{
+          width:          60,
+          height:         60,
+          borderRadius:   '50%',
+          background:     '#1A1A1A',
+          border:         'none',
+          boxShadow:      '0 4px 16px rgba(0,0,0,0.25)',
+          animation:      (todayCalories?.mealCount ?? 0) > 0
+            ? undefined
+            : 'breathe 2.8s ease-in-out infinite',
+          cursor:         'pointer',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          transition:     'transform 150ms ease',
+        }}
       >
-        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
-    </button>
+        <svg
+          width="26" height="26" viewBox="0 0 24 24"
+          fill="none" stroke="white" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+    </div>
     </>
   )
 }

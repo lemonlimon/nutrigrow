@@ -661,7 +661,7 @@ function FoodSection({
                           ${isAr ? 'flex-row-reverse' : ''}`}
               style={{
                 height:       56,
-                background:   '#0D5C45',
+                background:   '#1A1A1A',
                 color:        '#fff',
                 fontSize:     18,
                 borderRadius: 16,
@@ -951,15 +951,28 @@ const RING_R       = 19
 const RING_CIRC    = 2 * Math.PI * RING_R
 
 function CalorieRingCard({
-  low, high, mealCount,
+  low, mealCount, proteinG, carbsG, fatG,
 }: {
   low:       number
-  high:      number
   mealCount: number
+  proteinG:  number
+  carbsG:    number
+  fatG:      number
 }) {
-  const avg    = (low + high) / 2
-  const pct    = Math.min(100, Math.round((avg / CALORIE_GOAL) * 100))
-  const offset = RING_CIRC * (1 - pct / 100)
+  // Use calories_estimate_low as the "consumed" figure (conservative estimate)
+  const consumed    = low
+  const pct         = Math.min(100, Math.round((consumed / CALORIE_GOAL) * 100))
+  const isOverGoal  = consumed > CALORIE_GOAL
+  const diff        = Math.abs(consumed - CALORIE_GOAL)
+  const offset      = RING_CIRC * (1 - pct / 100)
+  const ringColor   = isOverGoal ? '#C0392B' : '#1D9E75'
+  const calColor    = isOverGoal ? '#C0392B' : '#0D5C45'
+
+  const MACROS = [
+    { emoji: '🥩', label: 'Protein', value: proteinG },
+    { emoji: '🌾', label: 'Carbs',   value: carbsG   },
+    { emoji: '🫒', label: 'Fat',     value: fatG     },
+  ]
 
   return (
     <div
@@ -982,47 +995,91 @@ function CalorieRingCard({
           No meals logged yet
         </p>
       ) : (
-        <div className="flex items-center gap-4">
-          <svg width={48} height={48} viewBox="0 0 48 48">
-            <circle
-              cx={24} cy={24} r={RING_R}
-              fill="none" stroke="#E8F5F0" strokeWidth={5}
-            />
-            <circle
-              cx={24} cy={24} r={RING_R}
-              fill="none"
-              stroke="#1D9E75"
-              strokeWidth={5}
-              strokeDasharray={RING_CIRC}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              transform="rotate(-90 24 24)"
-            />
-            <text
-              x={24} y={24}
-              textAnchor="middle"
-              dominantBaseline="central"
-              style={{ fontSize: 10, fill: '#0D5C45', fontWeight: 600 }}
-            >
-              {pct}%
-            </text>
-          </svg>
+        <>
+          {/* Calories row */}
+          <div className="flex items-center gap-4" style={{ marginBottom: 16 }}>
+            <svg width={48} height={48} viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
+              <circle
+                cx={24} cy={24} r={RING_R}
+                fill="none" stroke="#E8F5F0" strokeWidth={5}
+              />
+              <circle
+                cx={24} cy={24} r={RING_R}
+                fill="none"
+                stroke={ringColor}
+                strokeWidth={5}
+                strokeDasharray={RING_CIRC}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                transform="rotate(-90 24 24)"
+              />
+              <text
+                x={24} y={24}
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{ fontSize: 9, fill: calColor, fontWeight: 600 }}
+              >
+                {pct}%
+              </text>
+            </svg>
 
-          <div>
-            <p
-              className="font-dm-sans font-bold"
-              style={{ fontSize: 22, color: '#0D5C45', lineHeight: 1.1 }}
-            >
-              ~{low}–{high} kcal
-            </p>
-            <p
-              className="font-dm-sans"
-              style={{ fontSize: 12, color: '#999', marginTop: 4 }}
-            >
-              from {mealCount} meal photo{mealCount !== 1 ? 's' : ''}
-            </p>
+            <div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span
+                  className="font-dm-sans font-bold"
+                  style={{ fontSize: 22, color: calColor, lineHeight: 1.1 }}
+                >
+                  {consumed.toLocaleString()}
+                </span>
+                <span
+                  className="font-dm-sans"
+                  style={{ fontSize: 14, color: '#BBB' }}
+                >
+                  / {CALORIE_GOAL.toLocaleString()} kcal
+                </span>
+              </div>
+              <p
+                className="font-dm-sans"
+                style={{ fontSize: 11, color: isOverGoal ? '#C0392B' : '#666', marginTop: 3 }}
+              >
+                {isOverGoal ? `+${diff} over goal` : `${diff} remaining`}
+              </p>
+              <p
+                className="font-dm-sans"
+                style={{ fontSize: 12, color: '#999', marginTop: 2 }}
+              >
+                from {mealCount} meal photo{mealCount !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
-        </div>
+
+          {/* Daily macro totals */}
+          <div
+            className="flex"
+            style={{ borderTop: '1px solid #F0F0F0', paddingTop: 12 }}
+          >
+            {MACROS.map(({ emoji, label, value }, i) => (
+              <div
+                key={label}
+                className="flex-1 flex flex-col items-center"
+                style={i > 0 ? { borderLeft: '1px solid #F0F0F0' } : undefined}
+              >
+                <p
+                  className="font-dm-sans uppercase"
+                  style={{ fontSize: 11, color: '#999' }}
+                >
+                  {emoji} {label}
+                </p>
+                <p
+                  className="font-dm-sans font-bold"
+                  style={{ fontSize: 16, color: '#1A1A1A', marginTop: 2 }}
+                >
+                  {value}g
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
@@ -1039,7 +1096,14 @@ export default function PatientHomePage() {
   const [lastMeal,     setLastMeal]     = useState<FoodLog | null>(null)   // Feature 1
   const [streak,       setStreak]       = useState(0)                       // Feature 3
   const [dailyTip,     setDailyTip]     = useState<DailyTip | null>(null)  // Daily tip
-  const [todayCalories, setTodayCalories] = useState<{ low: number; high: number; mealCount: number } | null>(null)
+  const [todayCalories, setTodayCalories] = useState<{
+    low:      number
+    high:     number
+    mealCount: number
+    proteinG: number
+    carbsG:   number
+    fatG:     number
+  } | null>(null)
   const [loading,      setLoading]      = useState(true)
 
   const isAr          = patient?.preferred_language === 'ar'
@@ -1112,7 +1176,7 @@ export default function PatientHomePage() {
           .eq('patient_id', pat.id)
           .gte('logged_at', streakISO),
         db.from('food_logs')
-          .select('calories_estimate_low, calories_estimate_high')
+          .select('calories_estimate_low, calories_estimate_high, protein_g, carbs_g, fat_g')
           .eq('patient_id', pat.id)
           .gte('logged_at', startOfDay().toISOString()),
       ])
@@ -1127,9 +1191,12 @@ export default function PatientHomePage() {
       setStreak(calcStreak(allDates))
 
       if (todayFoodData && todayFoodData.length > 0) {
-        const low  = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_low  ?? 0), 0)
-        const high = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_high ?? 0), 0)
-        setTodayCalories({ low, high, mealCount: todayFoodData.length })
+        const low      = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_low  ?? 0), 0)
+        const high     = todayFoodData.reduce((sum, r) => sum + (r.calories_estimate_high ?? 0), 0)
+        const proteinG = todayFoodData.reduce((sum, r) => sum + (r.protein_g ?? 0), 0)
+        const carbsG   = todayFoodData.reduce((sum, r) => sum + (r.carbs_g   ?? 0), 0)
+        const fatG     = todayFoodData.reduce((sum, r) => sum + (r.fat_g     ?? 0), 0)
+        setTodayCalories({ low, high, mealCount: todayFoodData.length, proteinG, carbsG, fatG })
       }
 
       // Fetch daily tip (fire-and-forget — page renders without blocking)
@@ -1189,9 +1256,11 @@ export default function PatientHomePage() {
 
       {/* Daily Calorie Running Total */}
       <CalorieRingCard
-        low={todayCalories?.low ?? 0}
-        high={todayCalories?.high ?? 0}
+        low={todayCalories?.low       ?? 0}
         mealCount={todayCalories?.mealCount ?? 0}
+        proteinG={todayCalories?.proteinG   ?? 0}
+        carbsG={todayCalories?.carbsG       ?? 0}
+        fatG={todayCalories?.fatG           ?? 0}
       />
 
       <FoodSection
@@ -1199,10 +1268,14 @@ export default function PatientHomePage() {
         isAr={isAr}
         onConfirmed={(meal, calLow, calHigh) => {
           setLastMeal(meal)
-          setTodayCalories(prev => prev
-            ? { low: prev.low + calLow, high: prev.high + calHigh, mealCount: prev.mealCount + 1 }
-            : { low: calLow, high: calHigh, mealCount: 1 }
-          )
+          setTodayCalories(prev => ({
+            low:       (prev?.low      ?? 0) + calLow,
+            high:      (prev?.high     ?? 0) + calHigh,
+            mealCount: (prev?.mealCount ?? 0) + 1,
+            proteinG:  (prev?.proteinG  ?? 0) + (meal.protein_g ?? 0),
+            carbsG:    (prev?.carbsG    ?? 0) + (meal.carbs_g   ?? 0),
+            fatG:      (prev?.fatG      ?? 0) + (meal.fat_g     ?? 0),
+          }))
         }}
       />
 

@@ -1,14 +1,18 @@
 import { DashboardNavPills } from './DashboardNavPills'
 import { SignOutButton }     from './SignOutButton'
+import AdminBanner           from '@/app/components/AdminBanner'
 
 // ── Layout — mobile-first, no sidebar ────────────────────────────────────────
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
     <div className="min-h-screen bg-canvas">
+
+      {/* ── Admin impersonation banner (amber, only shown when cookie is set) ── */}
+      <AdminBanner />
 
       {/* ── Sticky header + nav pills ── */}
       <div

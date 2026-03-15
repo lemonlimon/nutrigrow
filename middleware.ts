@@ -10,6 +10,8 @@ export async function middleware(request: NextRequest) {
     '/login',
     '/patient/signup',
     '/join',
+    '/onboarding',     // onboarding flow (both unauthenticated and authenticated)
+    '/auth/callback',  // OAuth / magic-link callback
     '/api/',
     '/_next/',
     '/favicon',

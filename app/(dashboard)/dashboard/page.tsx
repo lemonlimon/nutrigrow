@@ -143,7 +143,7 @@ export default async function DashboardPage({
   let loggedToday   = 0
   let avgMealScore: number | null = null
   let weekWeighIns  = 0
-  let lastFoodMap:   Record<string, { logged_at: string; meal_score: number | null }> = {}
+  let lastLogMap:    Map<string, string> = new Map()
   let lastWeightMap: Record<string, string> = {}
 
   if (patientIds.length > 0) {
@@ -151,7 +151,7 @@ export default async function DashboardPage({
       { data: todayFoodLogs },
       { data: weekFoodScores },
       { count: weekWeighInCount },
-      { data: rpcFoodLogs },
+      { data: lastLogs },
       { data: rpcWeightLogs },
     ] = await Promise.all([
       // patients who logged anything today
@@ -173,8 +173,8 @@ export default async function DashboardPage({
         .in('patient_id', patientIds)
         .gte('logged_at', sevenDaysBack.toISOString()),
 
-      // last food log per patient — efficient RPC, no LIMIT 500 needed
-      admin.rpc('get_last_food_log_per_patient', { patient_ids: patientIds }),
+      // last log per patient — unified RPC
+      admin.rpc('get_last_log_per_patient', { patient_ids: patientIds }),
 
       // last weight log per patient — efficient RPC
       admin.rpc('get_last_weight_log_per_patient', { patient_ids: patientIds }),
@@ -194,11 +194,10 @@ export default async function DashboardPage({
 
     weekWeighIns = weekWeighInCount ?? 0
 
-    // Last food per patient — RPC already returns one row per patient
-    for (const log of (rpcFoodLogs ?? [])) {
-      const l = log as { patient_id: string; last_logged_at: string; meal_score: number | null }
-      lastFoodMap = { ...lastFoodMap, [l.patient_id]: { logged_at: l.last_logged_at, meal_score: l.meal_score } }
-    }
+    // Last log per patient — RPC returns one row per patient
+    lastLogMap = new Map(
+      (lastLogs ?? []).map((l: { patient_id: string; last_logged_at: string }) => [l.patient_id, l.last_logged_at])
+    )
 
     // Last weight per patient — RPC already returns one row per patient
     for (const log of (rpcWeightLogs ?? [])) {
@@ -218,8 +217,8 @@ export default async function DashboardPage({
 
   // ── Sort: green → amber → orange → grey ───────────────────────────────────
   const sortedRows = [...rows].sort((a, b) =>
-    getActivityTier(lastFoodMap[a.id]?.logged_at) -
-    getActivityTier(lastFoodMap[b.id]?.logged_at)
+    getActivityTier(lastLogMap.get(a.id)) -
+    getActivityTier(lastLogMap.get(b.id))
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -331,10 +330,10 @@ export default async function DashboardPage({
 
       {/* Patient rows */}
       {sortedRows.map((p) => {
-        const lastFood   = lastFoodMap[p.id]
-        const tier       = getActivityTier(lastFood?.logged_at)
-        const dotColor   = DOT_COLOR[tier]
-        const lastLogTxt = fmtLastLogged(lastFood?.logged_at)
+        const lastLoggedAt = lastLogMap.get(p.id)
+        const tier         = getActivityTier(lastLoggedAt)
+        const dotColor     = DOT_COLOR[tier]
+        const lastLogTxt   = fmtLastLogged(lastLoggedAt)
         const fullName   = p.last_name ? `${p.first_name} ${p.last_name}` : p.first_name
 
         return (

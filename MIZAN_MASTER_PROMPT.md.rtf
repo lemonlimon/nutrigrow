@@ -1,0 +1,891 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2821
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+MIZAN HEALTH (\uc0\u1605 \u1610 \u1586 \u1575 \u1606 ) \'97 MASTER SESSION PROMPT\
+Last updated: March 15, 2026\
+Version: 2.0\
+\uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+\
+\uc0\u9473 \u9473 \u9473  WHO I AM \u9473 \u9473 \u9473 \
+Founder: Clinical Research Scientist (PharmD) leading \
+clinical trials. Deep oncology expertise. Coding novice \'97\
+need exact step-by-step instructions at all times.\
+\
+Team:\
+- Brother: Physician (potential Medical Director)\
+- Sister: Co-founder, sales background\
+- Software developer friend: Potential technical co-founder\
+\
+Other ventures running in parallel:\
+- AgenticHOA (Atlanta CAM software AI agent)\
+- Pharma AI brand intelligence platform (oncology focus,\
+  April 30 ODAC deadline for first product sale)\
+\
+\uc0\u9473 \u9473 \u9473  THE PRODUCT \u9473 \u9473 \u9473 \
+MIZAN Health (\uc0\u1605 \u1610 \u1586 \u1575 \u1606  = "balance" in Arabic) is a \
+two-interface AI-powered obesity care platform.\
+\
+PRIMARY MARKET: KSA and UAE physician offices/clinics\
+SECONDARY MARKET: US obesity medicine practices with \
+  diverse patient panels (Arab-American, South Asian, \
+  Middle Eastern)\
+\
+TWO INTERFACES:\
+1. CLINIC DASHBOARD \'97 physician/staff web app\
+   Manages patients, views weekly digests, monitors trends,\
+   tracks engagement and meal scores\
+\
+2. PATIENT APP \'97 mobile-first PWA\
+   Daily food photo logging with AI analysis, weight \
+   tracking, water intake, contextual logging, streaks\
+\
+POSITIONING: \
+"The only obesity management platform built for Gulf-region \
+clinical practice \'97 culturally specific, AI-powered, \
+physician-supervised."\
+\
+NOT a consumer calorie app. NOT competing with Cal AI \
+or MyFitnessPal directly. This is B2B clinical tool sold \
+to physician offices, with the patient app as the \
+engagement layer.\
+\
+KEY DIFFERENTIATORS:\
+1. Gulf cultural specificity (Arabic, Gulf dishes, Ramadan \
+   mode) \'97 no competitor has this\
+2. Physician-supervised model \'97 patients enrolled BY their \
+   doctor, not self-enrolled\
+3. Clinical data owned by clinic not patient\
+4. PharmD license (founder) + physician brother = \
+   pharmacy capability (future)\
+5. First mover in KSA/UAE clinical obesity tech\
+6. Confirm-before-save food logging (prevents AI errors)\
+7. Bilingual EN/AR throughout\
+\
+\uc0\u9473 \u9473 \u9473  PROJECT DETAILS \u9473 \u9473 \u9473 \
+Local path: /Users/aishaahmed/Developer/nutrigrow\
+Production: nutrigrow.org\
+GitHub: github.com/lemonlimon/nutrigrow\
+Stack: Next.js 14, Supabase, Vercel, Anthropic API\
+Supabase project: sxwbfslbrjhjdtyypgfd.supabase.co\
+\
+Environment variables (set in Vercel + .env.local):\
+- NEXT_PUBLIC_SUPABASE_URL\
+- NEXT_PUBLIC_SUPABASE_ANON_KEY\
+- SUPABASE_SERVICE_ROLE_KEY\
+- ANTHROPIC_API_KEY\
+- USE_MOCK_AI=false (real AI is ON in production)\
+- NEXT_PUBLIC_APP_URL=https://nutrigrow.org\
+\
+Git workflow:\
+  cd /Users/aishaahmed/Developer/nutrigrow\
+  git add . && git commit -m "message" && git push\
+Vercel auto-deploys from GitHub (connected).\
+\
+\uc0\u9473 \u9473 \u9473  TEST ACCOUNTS \u9473 \u9473 \u9473 \
+Patient: test@test.com / Mizan2026\
+  Patient ID: 790aafc0-68d8-4a77-9405-5b5d0ed1720c\
+  Name: Sara Al-Qahtani\
+  Clinic: Oasis Weight Management Center\
+\
+Admin/Clinic: raed0345@gmail.com / Mizan2026!\
+  user_id: d4add076-945a-4552-a122-3d208f042fdf\
+  Roles: admin (all clinics) + clinic (Clinic 1)\
+\
+URLs:\
+  Patient login: nutrigrow.org/patient/login\
+  Clinic login: nutrigrow.org/login\
+  Admin panel: nutrigrow.org/admin (in progress)\
+\
+\uc0\u9473 \u9473 \u9473  DATABASE \'97 COMPLETE SCHEMA \u9473 \u9473 \u9473 \
+\
+clinics:\
+  id, name, owner_user_id (uuid \uc0\u8594  auth.users)\
+  \
+  Test data:\
+  Clinic 1: '00000000-0000-0000-0000-000000000001'\
+    name: 'Oasis Weight Management Center'\
+    owner: raed0345@gmail.com\
+  Clinic 2: '00000000-0000-0000-0000-000000000002'\
+    name: 'Al Noor Obesity & Metabolic Clinic'\
+\
+patients:\
+  id, clinic_id, first_name, last_name (added Mar 2026),\
+  date_of_birth (added Mar 2026), sex ('male'/'female'),\
+  age, weight_kg, height_cm, waist_cm, \
+  bmi (generated column), contact_method, contact_value,\
+  preferred_language, invite_token, invite_token_expires_at,\
+  invite_status ('invited'/'active'/'no_response'),\
+  enrolled_at, user_id\
+\
+  Clinic 1 patients (11 total):\
+  Sara Al-Qahtani, Omar Al-Harbi, Fatima Al-Ghamdi,\
+  Khalid Al-Shehri, Nora Al-Otaibi, Reem Al-Zahrani,\
+  Lulwa Al-Anzi, Maryam Al-Shamrani, Hessa Al-Hajri,\
+  Tariq Al-Bluwi, Abdulaziz Al-Dawsari\
+\
+  Clinic 2 patients (5 total):\
+  Layla Al-Rashidi (F, 31, 82.5kg, 28 days data)\
+  Tariq Al-Mutairi (M, 45, 105kg, 28 days data)\
+  Hessa Al-Suwaidi (F, 27, 74kg, 25 days data)\
+  Faisal Al-Dosari (M, 52, 118.5kg, 20 days data, \
+    poor engagement \'97 good for testing alerts)\
+  Maryam Al-Zahrani (F, 38, 91kg, 15 days data)\
+\
+weight_logs:\
+  id, patient_id, weight_kg, logged_at\
+\
+food_logs:\
+  id, patient_id, dish_name, \
+  tag ('red'/'yellow'/'green'),\
+  note_en, note_ar, logged_at,\
+  calories_estimate_low, calories_estimate_high,\
+  meal_type ('breakfast'/'lunch'/'dinner'/'snack'),\
+  protein_g, carbs_g, fat_g,\
+  meal_score (smallint 1-10, added Mar 2026)\
+\
+context_logs:\
+  id, patient_id, \
+  context ('regular'/'family_gathering'/'ramadan'/\
+           'travel'/'stressed'),\
+  logged_at\
+\
+water_logs:\
+  id, patient_id, \
+  glasses (STORES ML despite name \'97 technical debt,\
+           rename to amount_ml in future migration),\
+  logged_date (date type, NOT timestamp),\
+  updated_at,\
+  UNIQUE(patient_id, logged_date)\
+\
+daily_tips:\
+  id, patient_id, tip_en, tip_ar, tip_date,\
+  UNIQUE(patient_id, tip_date)\
+\
+user_roles:\
+  id, user_id (\uc0\u8594  auth.users), \
+  role ('admin'/'clinic'/'patient'),\
+  clinic_id (\uc0\u8594  clinics, null for admin),\
+  created_at,\
+  UNIQUE(user_id, clinic_id)\
+\
+  Current data:\
+  raed0345@gmail.com: admin (clinic_id null)\
+  raed0345@gmail.com: clinic (clinic_id = Clinic 1)\
+\
+Supabase RPC functions:\
+  get_last_log_per_patient(patient_ids uuid[])\
+    \uc0\u8594  Returns most recent food log per patient\
+    \uc0\u8594  Used by dashboard activity dots\
+    \uc0\u8594  Replaces broken .limit(500) query\
+\
+\uc0\u9473 \u9473 \u9473  AI MODELS \u9473 \u9473 \u9473 \
+Food photo analysis: claude-sonnet-4-6\
+  - Vision AI, analyzes food photos\
+  - Returns: dish_name, tag, note_en, note_ar,\
+    calories_estimate_low/high, meal_type,\
+    protein_g, carbs_g, fat_g\
+  - User input wrapped in XML to prevent injection:\
+    <patient_input>\{foodNameHint\}</patient_input>\
+  - Rate limited: 10 analyses per patient per day\
+\
+Daily tip: claude-haiku-4-5-20251001\
+  - 20x cheaper than Sonnet\
+  - Cached in daily_tips table (one per patient per day)\
+  - Bilingual EN/AR output\
+\
+Food logging flow (TWO-STEP, confirmed Mar 2026):\
+  1. POST /api/food-log/analyze \'97 calls Claude, \
+     returns result JSON, does NOT save to DB\
+  2. User sees pending card: "Does this look right?"\
+  3. POST /api/food-log/confirm \'97 saves to DB,\
+     computes meal_score server-side, returns score\
+  This prevents AI misidentification errors (e.g.,\
+  kabsa identified as chocolate donut in testing)\
+\
+Meal score computation (server-side at confirm):\
+  green tag \uc0\u8594  8-9 (randomized)\
+  yellow tag \uc0\u8594  5-7 (randomized)\
+  red tag \uc0\u8594  2-4 (randomized)\
+\
+\uc0\u9473 \u9473 \u9473  WHAT IS BUILT AND WORKING \u9989  \u9473 \u9473 \u9473 \
+\
+PATIENT SIDE (nutrigrow.org/patient/home):\
+\
+Header:\
+  - Sticky: "\uc0\u1605 \u1610 \u1586 \u1575 \u1606 " (Tajawal, green) + "MIZAN" \
+    (Playfair Display, black)\
+\
+Calendar strip (sticky below header):\
+  - Swipeable horizontal, 28 days (21 past + today + 6 future)\
+  - Centered on today on mount\
+  - Grey background #F2F2F7\
+  - Circle states: today (filled green), logged (green \
+    border + dot), future (light border), missed (grey dot)\
+  - KNOWN ISSUE: Missing month labels when scrolling \
+    across month boundary (fix queued)\
+\
+Greeting:\
+  - Time-based: Good morning/afternoon/evening/night\
+  - Patient first name\
+  - Emoji: \uc0\u55356 \u57093 \u9728 \u65039 \u55356 \u57094 \u55356 \u57113 \
+\
+Streak: "\uc0\u55357 \u56613  N day streak" below greeting\
+\
+Hero dashboard (two donut rings + weight bar):\
+  LEFT CARD \'97 Calories:\
+    SVG donut ring (120px)\
+    Green #1D9E75 if under goal, terracotta #E8623A if over\
+    Center: \uc0\u55356 \u57213 \u65039  emoji (or \u55357 \u56613  \'97 inconsistency to fix)\
+    Shows: "X / 1,800 kcal"\
+    Over goal: "+X over goal" in terracotta\
+    Empty state: dashed ring + "Tap \uc0\u55357 \u56568  to log first meal"\
+    Tapping scrolls to food section\
+  \
+  RIGHT CARD \'97 Water:\
+    SVG donut ring (120px), blue #3B82F6\
+    Shows: "X ml / 2,000 ml goal"\
+    KNOWN BUG: Shows yesterday's water on new day\
+    (timezone issue, fix queued)\
+    Tapping scrolls to water tracker\
+  \
+  WEIGHT BAR (full width below cards):\
+    "\uc0\u9878 \u65039  +X.X kg on program" terracotta if gained,\
+    green if lost\
+    "Since [date]" right aligned\
+\
+Weekly weight chart:\
+  - SVG area chart, gradient fill\
+  - Grey line/fill if weight increasing\
+  - Green line/fill if weight decreasing\
+  - Open circles at data points\
+  - Delta label on last point\
+  - Weight history rows below (deduped by date)\
+  - kg/lbs toggle input with Save button\
+  - "Skip for now \'97 no pressure" microcopy\
+\
+Today's Calories card:\
+  - "X / 1,800 kcal" with over/under indicator\
+  - Progress ring (red if over)\
+  - Daily macro totals row: protein / carbs / fat\
+    Each with colored pill background:\
+    Protein: #FFF0EB bg / #E8623A text\
+    Carbs: #FFF8EB bg / #D4860A text\
+    Fat: #F0FAF5 bg / #1D9E75 text\
+  - "from N meal photos" subtitle\
+\
+Food logging section:\
+  - "What did you eat?" header\
+  - Meal type selector: Breakfast/Lunch/Dinner/Snack\
+  - Optional food name hint input\
+  - "\uc0\u55357 \u56568 \u55357 \u56485  Log a Meal" button (#1A1A1A, 56px, full width)\
+  - Hidden file input: accept="image/*", NO capture attr\
+    (gives iOS/Android choice: camera/library/files)\
+  - Photo preview with "Analyzing your meal..." spinner\
+  - Pending card: dashed border, "Does this look right?"\
+    Shows: dish name, tag badge, calorie range, \
+    macro pills, meal score bar\
+    "\uc0\u10003  Yes, that's right" (green confirm button)\
+    "\uc0\u8617  Retake photo" (grey button)\
+  - On confirm: \uc0\u10024  celebration overlay 2.2s fade\
+  - Last Meal card: dish name, calories, macros,\
+    tag badge, coaching note, timestamp\
+\
+Floating Action Button (FAB):\
+  - Fixed bottom-right, above nav bar\
+  - Terracotta #E8623A when no meals logged today\
+  - Black #1A1A1A when meals logged (task complete)\
+  - Breathe animation + sparkle stars when terracotta\
+  - Same file input trigger as Log a Meal button\
+\
+Water tracker:\
+  - Shows current ml / 2,000 ml goal\
+  - Progress bar\
+  - Bottle animation\
+  - Fraction selector: \'bc/\'bd/\'be/Full bottle\
+  - Bottle size selector: 250/350/500/750ml/1L\
+  - "Log this drink" button (blue)\
+  - ml/oz toggle\
+  - Reset today link\
+\
+Context selector ("Today's feeling"):\
+  Regular day / Family gathering / Ramadan / \
+  Travel / Stressed\
+\
+Today's Insight (bottom of page):\
+  - Collapsible, default collapsed\
+  - White card, amber left border #F5A623\
+  - Bilingual EN/AR tip from Claude Haiku\
+  - Cached daily, not regenerated on each load\
+\
+Bottom nav: Home | Progress\
+\
+PROGRESS PAGE (nutrigrow.org/patient/progress):\
+  - Streak cards: \uc0\u55357 \u56613  logging streak / \u55357 \u56568  photo streak\
+  - Weight change: start \uc0\u8594  delta \u8594  current\
+  - Goal progress bar ("Goal not set yet" if null)\
+  - Weight chart (30 days)\
+  - This week's nutrition 2\'d72 grid:\
+    Avg calories / Avg protein / Avg carbs / Avg fat\
+\
+CLINIC SIDE (nutrigrow.org/dashboard):\
+  - Sticky \uc0\u1605 \u1610 \u1586 \u1575 \u1606 /MIZAN header\
+  - Hero stats 2\'d72 grid:\
+    Total Patients / Logged Today / \
+    Avg Meal Score / Weigh-ins This Week\
+  - Patient list with activity dots:\
+    Green = logged today\
+    Amber = 2-3 days ago\
+    Orange = 4-6 days ago\
+    Grey = 7+ days or never\
+  - Full names shown (First Last)\
+  - BMI badges\
+  - "+ Enroll" button (UI only, flow not built yet)\
+  - Tapping patient \uc0\u8594  /patients/[id]\
+\
+PATIENT DETAIL (nutrigrow.org/patients/[id]):\
+  - \uc0\u1605 \u1610 \u1586 \u1575 \u1606 /MIZAN header\
+  - Patient full name (Playfair Display 28px)\
+  - BMI / Age / Enrolled date pills\
+  - Activity status banner (green/amber/orange)\
+  - Starting weight + enrollment date\
+  - Weight delta since enrollment\
+  - Weekly Digest:\
+    Weight trend chart\
+    Estimated calories this week\
+    Context summary (Regular day \'d7N, etc.)\
+\
+\uc0\u9473 \u9473 \u9473  KNOWN BUGS (queued for fix) \u9473 \u9473 \u9473 \
+1. Water hero card shows yesterday's water on new day\
+   Root cause: UTC vs local timezone mismatch\
+   Fix: Use date-fns-tz with Asia/Riyadh for server queries\
+   Use local date string for client queries\
+\
+2. Calendar strip missing month labels when scrolling\
+   Fix: Show month name above first day of each month\
+   Also show static "March 2026" above strip\
+\
+3. Calorie donut ring shows \uc0\u55357 \u56613  in some states, \
+   should always be \uc0\u55356 \u57213 \u65039  when empty\
+\
+4. Water minimum arc \'97 at very low values the blue \
+   arc looks like a rendering error\
+   Fix: Minimum visible arc of 15\'b0\
+\
+5. Page background color inconsistency \'97 \
+   some sections white on white\
+\
+6. Duplicate dates still appearing in weight chart \
+   x-axis (Mar 14 shown twice)\
+\
+\uc0\u9473 \u9473 \u9473  SECURITY STATUS \u9473 \u9473 \u9473 \
+Fixed (March 2026):\
+  \uc0\u9989  API endpoints now require auth (401 if no session)\
+  \uc0\u9989  Prompt injection: foodNameHint wrapped in XML tags\
+  \uc0\u9989  Timezone: date-fns-tz installed, server uses \
+     Asia/Riyadh for "today" calculations\
+  \uc0\u9989  RPC function replaces broken .limit(500) query\
+  \uc0\u9989  Weight chart flatline fix (padding when max=min)\
+\
+Still needed:\
+  \uc0\u10060  Dynamic clinic_id from session \
+     (currently hardcoded in dashboard \'97 \
+      BREAKS when second clinic logs in)\
+  \uc0\u10060  Full RLS policies in Supabase\
+     (currently relying on app-level filtering,\
+      service role key used everywhere)\
+  \uc0\u10060  IDOR fix on report generation endpoint\
+  \uc0\u10060  Supabase TypeScript type generation\
+     (supabase gen types typescript)\
+\
+\uc0\u9473 \u9473 \u9473  IN PROGRESS (Claude Code session running now) \u9473 \u9473 \u9473 \
+- Admin panel (/admin) with clinic switcher\
+- Patient impersonation (admin views as any patient)\
+- Dynamic clinic_id from session\
+- Role-based auth in middleware\
+- Full names in all clinic views\
+\
+\uc0\u9473 \u9473 \u9473  DESIGN SYSTEM (non-negotiable) \u9473 \u9473 \u9473 \
+\
+Colors:\
+  Background: #FAFAF8\
+  Brand green dark: #0D5C45\
+  Brand green mid: #1D9E75\
+  Brand green light: #E8F5F0\
+  Off-black: #1A1A1A\
+  Terracotta: #E8623A (over-goal, FAB active, alerts)\
+  Amber/gold: #F5A623 (streak, achievements, admin mode)\
+  Blue: #3B82F6 (water only)\
+  Amber dark: #D4860A (carbs label)\
+\
+Semantic colors:\
+  Protein pills: #FFF0EB bg / #E8623A text\
+  Carbs pills: #FFF8EB bg / #D4860A text\
+  Fat pills: #F0FAF5 bg / #1D9E75 text\
+  Activity dot green: #1D9E75\
+  Activity dot amber: #F5A623\
+  Activity dot orange: #E8623A\
+  Activity dot grey: #CCC\
+  Admin mode banner: #FFF8EB bg / #F5A623 border\
+\
+Typography:\
+  Headings: Playfair Display\
+  Body: DM Sans\
+  Arabic: Tajawal\
+  \
+Spacing:\
+  Mobile-first, max-width 480px content\
+  Border radius: 12px buttons, 16px cards\
+  Card shadow: 0 1px 4px rgba(0,0,0,0.06)\
+  Bottom padding: pb-24 (clears bottom nav)\
+\
+\uc0\u9473 \u9473 \u9473  TECHNICAL RULES \u9473 \u9473 \u9473 \
+- createAdminClient() for server-side Supabase queries\
+- Never use createClient() in dashboard/patient pages\
+- Food AI: claude-sonnet-4-6\
+- Daily tip: claude-haiku-4-5-20251001\
+- Date calculations: always use date-fns or date-fns-tz\
+- Server timezone: Asia/Riyadh (UTC+3)\
+- Client timezone: device local (browser handles correctly)\
+- No TypeScript errors before pushing (npx tsc --noEmit)\
+- npm run build must succeed before git push\
+- No hardcoded UUIDs in production code\
+- User input in prompts: wrap in XML tags\
+\
+\uc0\u9473 \u9473 \u9473  PRICING & BUSINESS MODEL \u9473 \u9473 \u9473 \
+\
+Current model (B2B SaaS):\
+  $299/month \'97 up to 50 patients per clinic\
+  $499/month \'97 unlimited patients per clinic\
+  Annual plan: 2 months free\
+  Target: 50 clinics = $15,000/month revenue\
+\
+Infrastructure costs at scale:\
+  Vercel Pro: $20/month\
+  Supabase Pro: $25/month\
+  Anthropic API (500 patients, 2 photos/day): ~$90/month\
+  Total at 500 patients: ~$135/month\
+  Gross margin at 10 clinics: ~95%\
+\
+Future model (B2B2C + Pharmacy):\
+  Clinic pays platform fee\
+  Patient optionally pays for GLP-1 medication\
+  (compounded, shipped by PharmD founder + physician)\
+  $150-300/month medication subscription\
+\
+Exit thesis:\
+  Acquire 50-100 Gulf clinics + 20-30 US clinics\
+  Prove outcomes (weight loss %, adherence %)\
+  Strategic acquirers: Noom, Calibrate, Ro, \
+  Hims/Hers, Saudi/UAE digital health funds,\
+  Epic/Cerner (EHR play), Novo Nordisk/Lilly\
+  Target: $50-200M (10-40x on $5M ARR)\
+  Billion dollar path: pharmacy + MOH KSA/UAE \
+  government contracts + US rollout\
+\
+\uc0\u9473 \u9473 \u9473  COMPETITIVE BENCHMARKS \u9473 \u9473 \u9473 \
+\
+Pharma spend benchmarks (for future partnerships):\
+  theMednet MSA with Lilly: $350K (monarchE/abemaciclib)\
+  OncLive invoice: $112,500 for single SABCS congress\
+  SSCG Media SOW: $349,851 for Loxo SERD campaign\
+\
+\uc0\u9473 \u9473 \u9473  ROADMAP \u9473 \u9473 \u9473 \
+\
+\uc0\u9472 \u9472 \u9472  PHASE 1: DEMO-READY (Target: April 2026) \u9472 \u9472 \u9472 \
+Goal: Walk into first KSA/UAE clinic meeting with \
+a working product on both screens.\
+\
+\uc0\u55357 \u56628  CRITICAL \'97 Must complete before first clinic demo:\
+\
+1. Admin panel + clinic switcher (IN PROGRESS)\
+   - /admin page listing all clinics + patients\
+   - Admin can impersonate any patient\
+   - Admin sees all clinics, can switch between them\
+   - Clinic staff only sees their own patients\
+\
+2. Dynamic clinic_id (IN PROGRESS)\
+   - Dashboard reads clinic from session, not hardcode\
+   - Second clinic login shows their patients only\
+\
+3. Role-based middleware (IN PROGRESS)\
+   - Patients cannot access /dashboard\
+   - Clinic staff cannot access /patient/home\
+   - Admin can access everything\
+\
+4. Patient enrollment flow (NOT STARTED \'97 high priority)\
+   Full onboarding journey when patient receives invite:\
+   \
+   Step 1: Welcome screen\
+     "\uc0\u1605 \u1610 \u1586 \u1575 \u1606  was prescribed by your doctor"\
+     Brand animation, bilingual\
+   \
+   Step 2: Verify clinic email\
+     Enter email \uc0\u8594  check exists in patients table\
+     If not found: "Ask your clinic for your invite"\
+   \
+   Step 3: Email verification (OTP or magic link)\
+   \
+   Step 4: Create password\
+   \
+   Step 5: What's your name?\
+     First name + Last name (updates patients table)\
+   \
+   Step 6: Date of birth\
+     (updates patients.date_of_birth)\
+   \
+   Step 7: Goal setting (emotional buy-in, Noom-style)\
+     "What matters most to you?" multi-select cards:\
+     \uc0\u55356 \u57213 \u65039  Understand what I eat\
+     \uc0\u9878 \u65039  Track my weight journey\
+     \uc0\u55357 \u56487  Build healthy habits\
+     \uc0\u55357 \u56458  Support my medication\
+   \
+   Step 8: Starting measurements (one per card)\
+     Height \uc0\u8594  Weight \u8594  Waist circumference\
+     Each card: motivating subtitle\
+     "This helps your doctor personalize your care"\
+   \
+   Step 9: App suggests goals\
+     "Based on your profile, we suggest 1,800 kcal/day"\
+     Slider to adjust (800-3000 range)\
+     Same for water: "We suggest 2,000 ml/day"\
+     Stores in new patient_goals table:\
+       patient_id, calorie_goal, water_goal_ml,\
+       goal_weight_kg, updated_at\
+   \
+   Step 10: Phone number (optional)\
+     "For appointment reminders"\
+   \
+   Step 11: Terms & Conditions + email marketing opt-in\
+     Clean layout, not a wall of text\
+   \
+   Step 12: \uc0\u55356 \u57225  "You're all set!" celebration\
+     "Log your first meal \'97 your doctor will see it"\
+     \uc0\u8594  triggers camera immediately\
+   \
+   Step 13: \uc0\u8594  /patient/home\
+\
+5. Calorie/water goals per patient\
+   New table: patient_goals\
+   Clinic can set per patient or patient sets in onboarding\
+   Dashboard defaults (1800 kcal / 2000ml) become \
+   personalized to each patient\
+\
+6. Fix all known bugs (listed above)\
+\
+\uc0\u9472 \u9472 \u9472  PHASE 2: FIRST PAYING CLINIC (Target: May 2026) \u9472 \u9472 \u9472 \
+Goal: One clinic paying $299/month. \
+Real patients enrolled. Real data flowing.\
+\
+7. Clinic self-serve registration\
+   /register for new clinics\
+   Clinic name, physician name, specialty, country\
+   Creates clinic record + owner_user_id\
+   Sends welcome email (Resend)\
+\
+8. Stripe payment integration\
+   $299/month (\uc0\u8804 50 patients)\
+   $499/month (unlimited)\
+   Annual: 2 months free\
+   Trial: 14 days free, no credit card\
+   Webhook: on payment \uc0\u8594  activate clinic\
+   On failure \uc0\u8594  grace period 7 days \u8594  suspend\
+\
+9. Real patient invite flow\
+   Clinic enters patient email in dashboard\
+   System sends invite email (Resend) with magic link\
+   SMS invite option (Twilio) for Gulf patients\
+   (WhatsApp preferred in KSA/UAE \'97 consider later)\
+\
+10. Medication reminders (GLP-1 differentiator)\
+    New table: patient_medications\
+      patient_id, medication_name, dose_mg,\
+      frequency ('daily_injection'/'weekly_injection'/\
+                 'daily_pill'), reminder_time, active\
+    \
+    Patient home: reminder card with "Mark as taken"\
+    Clinic dashboard: adherence % in weekly digest\
+    \
+    Gulf-relevant medications:\
+    Ozempic (semaglutide weekly injection)\
+    Wegovy (semaglutide weekly, higher dose)\
+    Mounjaro/Zepbound (tirzepatide weekly)\
+    Saxenda (liraglutide daily injection)\
+    Qsymia (daily pill)\
+\
+11. Weekly email digest to clinic (Resend)\
+    Every Monday: summary of each patient's week\
+    Weight change, meal photos logged, avg score,\
+    water adherence, medication adherence\
+    One-click to view full patient detail\
+\
+12. Contextual AI messages (expand daily tip system)\
+    Context-aware messages beyond daily tip:\
+    - After logging healthy meal: coaching note\
+    - After weight loss: celebration\
+    - After 3-day streak: encouragement  \
+    - After 2 days no log: gentle nudge\
+    - Ramadan mode: special iftar/suhoor guidance\
+    - Morning first open: personalized greeting\
+    All via Claude Haiku (cheap), cached appropriately\
+\
+\uc0\u9472 \u9472 \u9472  PHASE 3: SCALE TO 10 CLINICS (Target: Aug 2026) \u9472 \u9472 \u9472 \
+Goal: $3,000-5,000 MRR. Product-market fit signal.\
+\
+13. Arabic language toggle\
+    preferred_language column already exists\
+    Full AR translation for patient app\
+    RTL layout support (Tajawal already loaded)\
+    Gulf mode: Arabic prominent, \uc0\u1605 \u1610 \u1586 \u1575 \u1606  shown\
+    International mode: English, Western foods weighted\
+\
+14. Location + restaurant detection\
+    Browser geolocation API (PWA supports this)\
+    Google Places API: detect nearest restaurant\
+    Banner: "\uc0\u55357 \u56525  Looks like you're at [Restaurant]"\
+    Gulf chain menu database to build:\
+      Al Baik (KSA institution)\
+      Kudu (Saudi burger chain)\
+      Hardees KSA (different menu from US)\
+      McDonald's Arabia\
+      Starbucks Arabia\
+      Panda supermarket prepared foods\
+    Exact calories/macros from menu = \
+    better accuracy than photo AI\
+    Privacy: location used in-moment only, not stored\
+\
+15. Calendar full-month pull-down view\
+    Currently: horizontal scroll strip\
+    Upgrade: Cal AI style bottom sheet\
+    Full month grid, tapping day shows that day's logs\
+    Edit past entries (add/correct)\
+\
+16. Progress photos\
+    Patient uploads weekly photo (private)\
+    Visible to patient + clinic only\
+    Side-by-side comparison view\
+    Stored in Supabase Storage (not DB)\
+\
+17. Barcode scanner for packaged foods\
+    PWA camera \uc0\u8594  barcode scan\
+    Open Food Facts API (free, good Gulf coverage)\
+    Or Nutritionix API (better data, paid)\
+    Logs packaged food with exact nutrition\
+\
+18. Clinical alerts system (physician dashboard)\
+    "Needs Attention" tab showing:\
+    "No logs in 5 days" \'97 patient disengaged\
+    "Gained 2kg in a week" \'97 clinical concern\
+    "Reported stressed 3x this week" \'97 lifestyle flag\
+    "Missed 3 medication doses" \'97 adherence issue\
+    Physician can add a note per alert\
+\
+\uc0\u9472 \u9472 \u9472  PHASE 4: GULF MARKET LAUNCH (Target: Q4 2026) \u9472 \u9472 \u9472 \
+\
+19. Native iOS/Android app (React Native)\
+    Current PWA is good for MVP, not for scale\
+    Push notifications (critical for reminders)\
+    Apple HealthKit / Google Fit integration\
+    Bluetooth scale integration\
+    Camera experience is better native\
+\
+20. Bluetooth scale integration\
+    Requires: sufficient revenue + founder leaves \
+    clinical research scientist role\
+    Renpho, Withings, or Omron scales\
+    Auto-syncs weight without manual entry\
+\
+21. CGM integration\
+    Continuous Glucose Monitor data\
+    Abbott Libre, Dexcom G7\
+    Shows glucose response to meals\
+    Requires same revenue milestone as scale\
+\
+22. Compounding pharmacy integration\
+    PharmD license (founder) + physician brother\
+    = legal ability to prescribe + compound GLP-1s\
+    Monthly medication subscription: $150-300/patient\
+    Semaglutide, tirzepatide compounds\
+    Direct-to-patient model layered on B2B clinic base\
+\
+23. SFDA compliance (KSA)\
+    Saudi Food & Drug Authority\
+    Wellness app classification (not medical device)\
+    Required for KSA App Store listing\
+    Timeline: 3-6 months process\
+\
+24. MOH UAE partnership\
+    Ministry of Health UAE\
+    Government patient referral program\
+    Requires: track record + outcomes data\
+\
+\uc0\u9472 \u9472 \u9472  PHASE 5: US EXPANSION + EXIT PREP \u9472 \u9472 \u9472 \
+\
+25. US market entry\
+    Target: US obesity medicine practices\
+    With Arab-American, South Asian patient panels\
+    HIPAA compliance audit (currently PDPL-adjacent)\
+    Epic/Cerner EHR integration (referral pathway)\
+\
+26. Multi-clinic enterprise tier\
+    $2,000+/month for health systems\
+    White-label option\
+    Custom branding per clinic\
+\
+27. AI-powered physician notes\
+    Summarize patient week for clinic visit\
+    "Sara had 8 meals this week, avg score 7.2,\
+     lost 0.4kg, logged stress twice on Thursday"\
+    One-click copy to EHR note\
+\
+28. Gemini integration (food AI A/B test)\
+    Gemini trained on Google Lens / Maps data\
+    May outperform Claude on Gulf food identification\
+    A/B test: Claude vs Gemini per food category\
+    Use winner per cuisine type\
+\
+\uc0\u9472 \u9472 \u9472  STRETCH GOALS \u9472 \u9472 \u9472 \
+\
+29. WhatsApp bot integration\
+    KSA/UAE primary communication channel is WhatsApp\
+    Patient sends food photo via WhatsApp\
+    Bot responds with analysis\
+    No app download required \'97 removes barrier\
+    Twilio WhatsApp Business API\
+\
+30. Regional government contracts\
+    MOH KSA national obesity program\
+    $XM annual contract for platform access\
+    Requires: outcomes data + SFDA approval\
+\
+31. Physician AI assistant\
+    "Which of my patients needs the most attention?"\
+    "What's the average weight loss across my panel?"\
+    Natural language queries on patient data\
+    Claude with full patient context\
+\
+32. Franchised pharmacy model\
+    Partner with Gulf pharmacies (Al Dawaa, Nahdi)\
+    License the medication dispensing workflow\
+    Revenue share model\
+\
+\uc0\u9473 \u9473 \u9473  DO NOT BUILD (ever or until noted) \u9473 \u9473 \u9473 \
+- Physician reports / risk scores / traffic lights\
+  (avoid FDA Class II device language)\
+- Pediatric features\
+- CGM until revenue milestone\
+- Gamification / avatars / badges\
+- Telemedicine / physician messaging (liability)\
+- Social / community features\
+- Anything requiring FDA Class II device clearance\
+  MIZAN is a WELLNESS APP, not a medical device\
+- Steps / exercise tracking (not our focus)\
+- Food database search (Cal AI's moat, expensive)\
+\
+\uc0\u9473 \u9473 \u9473  AI PARTNER STRATEGY \u9473 \u9473 \u9473 \
+\
+Claude (claude.ai \'97 this conversation):\
+  Role: Technical co-founder / architect / strategist\
+  Use for: Architecture decisions, prompt writing,\
+  reviewing screenshots, business logic, SQL help,\
+  roadmap planning, investor prep, this master doc\
+  Memory: Maintains full product context across sessions\
+\
+Claude Code (desktop app):\
+  Role: Senior engineer / executor\
+  Use for: Writing code, reading files, running builds,\
+  pushing to GitHub\
+  Important: No memory between sessions\
+  Always start with the master session prompt\
+  One focused task per session for complex features\
+\
+Gemini Pro (aistudio.google.com):\
+  Role: External auditor / Gulf food expert\
+  Use for: Full codebase security audits (every 2-3 weeks\
+  or before major milestones), Gulf food photo testing,\
+  restaurant menu data for Gulf chains\
+  How: Export codebase with terminal command, paste to \
+  AI Studio with 1M token context window\
+\
+Sync protocol:\
+  After every 3-4 Claude Code sessions, paste latest\
+  state back to Claude (me) to update master prompt.\
+  Before any investor meeting or clinic demo, run\
+  full Gemini audit + Claude architecture review.\
+\
+\uc0\u9473 \u9473 \u9473  PATIENT ENROLLMENT \'97 CURRENT STATE \u9473 \u9473 \u9473 \
+Current (manual/testing):\
+  Clinic creates patient record in dashboard\
+  Patient receives invite link manually\
+  Patient goes to /join?token= to sign up\
+  Minimal onboarding, no measurements collected\
+\
+Target (Phase 1 \'97 build next):\
+  Full onboarding flow described in Phase 1 #4 above\
+  Patient sets own measurements + goals\
+  Clinic only inputs email address\
+  First meal logged before reaching home screen\
+\
+\uc0\u9473 \u9473 \u9473  IMMEDIATE NEXT SESSION (after current CC finishes) \u9473 \u9473 \u9473 \
+After admin/clinic switcher ships, priority order:\
+\
+SESSION A (already running): Admin + multi-clinic\
+SESSION B: Patient enrollment flow (full onboarding)\
+SESSION C: patient_goals table + personalized \
+           calorie/water goals\
+SESSION D: Medication reminders\
+SESSION E: Fix all known bugs (water timezone, \
+           calendar months, color inconsistencies)\
+SESSION F: Contextual AI messages\
+SESSION G: Clinic self-serve registration\
+SESSION H: Stripe integration\
+\
+\uc0\u9473 \u9473 \u9473  QUESTIONS TO RESOLVE (strategic decisions pending) \u9473 \u9473 \u9473 \
+\
+1. CLINIC 2 OWNER ACCOUNT\
+   Al Noor Obesity & Metabolic Clinic has no login yet.\
+   Need to create a Supabase auth user for the second\
+   physician and assign clinic role for clinic 2.\
+   Decision: Create demo physician account for testing.\
+\
+2. WATER COLUMN NAMING\
+   water_logs.glasses stores ml not glasses.\
+   Rename to amount_ml in a future migration.\
+   Low urgency but will confuse future developers.\
+\
+3. TAG COLOR NAMING\
+   food_logs.tag uses 'red'/'yellow'/'green'\
+   but UI shows 'Healthy'/'Moderate'/'Indulgent'\
+   Consider migration to semantic names for clarity.\
+\
+4. SINGLE ROLE VS MULTI-ROLE\
+   user_roles previously had UNIQUE(user_id).\
+   Now has UNIQUE(user_id, clinic_id) to allow\
+   admin + clinic roles for same user.\
+   Middleware needs to handle users with multiple roles.\
+\
+5. HIPAA vs PDPL\
+   US expansion requires HIPAA compliance.\
+   KSA requires PDPL (Personal Data Protection Law).\
+   UAE requires DIFC/ADGM data regulations.\
+   Need legal review before first paying clinic.\
+   Positioning as wellness app (not medical device)\
+   reduces regulatory burden significantly.\
+\
+6. LANGUAGE OF FIRST DEMO\
+   First clinic demo: English or Arabic?\
+   Recommendation: English demo with Arabic visible\
+   in the UI to show cultural fit. Full Arabic\
+   toggle in Phase 3.\
+\
+\uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+END OF MASTER PROMPT\
+Version 2.0 \'97 March 15, 2026\
+Next update: After admin session ships + enrollment \
+flow is scoped\
+\uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 }

@@ -8,6 +8,7 @@ import { cookies }           from 'next/headers'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import PatientHomeClient     from './PatientHomeClient'
+import AdminBanner           from '@/app/components/AdminBanner'
 
 export default async function PatientHomePage() {
   const cookieStore = cookies()
@@ -23,13 +24,13 @@ export default async function PatientHomePage() {
 
     if (user) {
       const admin = createAdminClient()
-      const { data: roleData } = await admin
+      const { data: rolesData } = await admin
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single()
 
-      if (roleData?.role === 'admin') {
+      const isAdmin = (rolesData ?? []).some(r => r.role === 'admin')
+      if (isAdmin) {
         // Fetch the patient's name for the banner
         const { data: pat } = await admin
           .from('patients')
@@ -46,9 +47,12 @@ export default async function PatientHomePage() {
   }
 
   return (
-    <PatientHomeClient
-      adminPatientId={adminPatientId}
-      adminPatientName={adminPatientName}
-    />
+    <>
+      <AdminBanner />
+      <PatientHomeClient
+        adminPatientId={adminPatientId}
+        adminPatientName={adminPatientName}
+      />
+    </>
   )
 }

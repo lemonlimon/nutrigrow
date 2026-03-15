@@ -18,13 +18,13 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
-  const { data: roleData } = await admin
+  const { data: rolesData } = await admin
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .single()
 
-  if (roleData?.role !== 'admin') {
+  const isAdmin = (rolesData ?? []).some(r => r.role === 'admin')
+  if (!isAdmin) {
     return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 })
   }
 

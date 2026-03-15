@@ -22,13 +22,13 @@ export default async function AdminPage() {
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: roleData } = await admin
+  const { data: rolesData } = await admin
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .single()
 
-  if (roleData?.role !== 'admin') redirect('/dashboard')
+  const isAdmin = (rolesData ?? []).some(r => r.role === 'admin')
+  if (!isAdmin) redirect('/dashboard')
 
   // ── Fetch all clinics ──────────────────────────────────────────────────────
   const { data: clinics } = await admin

@@ -1,7 +1,11 @@
 import Link                  from 'next/link'
+import { redirect }          from 'next/navigation'
+import { startOfDay }        from 'date-fns'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
+import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const CLINIC_ID = '00000000-0000-0000-0000-000000000001'
+const TIMEZONE = 'Asia/Riyadh'
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 function IconPerson() {
@@ -70,24 +74,36 @@ function fmtLastLogged(lastLoggedAt: string | undefined): string {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
-  const admin = createAdminClient()
+  // ── Auth + dynamic clinic ID ───────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  // UTC midnight for "logged today"
-  const todayStart = new Date()
-  todayStart.setUTCHours(0, 0, 0, 0)
+  const admin = createAdminClient()
+  const { data: clinicData } = await admin
+    .from('clinics')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .single()
+
+  const clinicId = clinicData?.id
+  if (!clinicId) redirect('/login')
+
+  // ── Timezone-aware "today" for KSA/UAE (UTC+3) ────────────────────────────
+  const nowInRiyadh  = toZonedTime(new Date(), TIMEZONE)
+  const todayStart   = fromZonedTime(startOfDay(nowInRiyadh), TIMEZONE)
+  const todayStr     = nowInRiyadh.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  })
 
   const sevenDaysBack = new Date()
   sevenDaysBack.setDate(sevenDaysBack.getDate() - 7)
-
-  const todayStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  })
 
   // Step 1: fetch patients first (need IDs for sub-queries)
   const { data: patients } = await admin
     .from('patients')
     .select('id, first_name, bmi, enrolled_at')
-    .eq('clinic_id', CLINIC_ID)
+    .eq('clinic_id', clinicId)
     .order('enrolled_at', { ascending: false })
 
   type PatientRow = { id: string; first_name: string; bmi: number | null; enrolled_at: string }
@@ -107,8 +123,8 @@ export default async function DashboardPage() {
       { data: todayFoodLogs },
       { data: weekFoodScores },
       { count: weekWeighInCount },
-      { data: allFoodLogs },
-      { data: allWeightLogs },
+      { data: rpcFoodLogs },
+      { data: rpcWeightLogs },
     ] = await Promise.all([
       // patients who logged anything today
       admin.from('food_logs')
@@ -129,19 +145,11 @@ export default async function DashboardPage() {
         .in('patient_id', patientIds)
         .gte('logged_at', sevenDaysBack.toISOString()),
 
-      // last food log per patient (for activity dot + last-logged text)
-      admin.from('food_logs')
-        .select('patient_id, logged_at, meal_score')
-        .in('patient_id', patientIds)
-        .order('logged_at', { ascending: false })
-        .limit(500),
+      // last food log per patient — efficient RPC, no LIMIT 500 needed
+      admin.rpc('get_last_food_log_per_patient', { patient_ids: patientIds }),
 
-      // last weight log per patient
-      admin.from('weight_logs')
-        .select('patient_id, logged_at')
-        .in('patient_id', patientIds)
-        .order('logged_at', { ascending: false })
-        .limit(500),
+      // last weight log per patient — efficient RPC
+      admin.rpc('get_last_weight_log_per_patient', { patient_ids: patientIds }),
     ])
 
     // Logged today: distinct patients
@@ -158,20 +166,16 @@ export default async function DashboardPage() {
 
     weekWeighIns = weekWeighInCount ?? 0
 
-    // Last food per patient (first occurrence in ordered list = most recent)
-    for (const log of (allFoodLogs ?? [])) {
-      const l = log as { patient_id: string; logged_at: string; meal_score: number | null }
-      if (!lastFoodMap[l.patient_id]) {
-        lastFoodMap = { ...lastFoodMap, [l.patient_id]: { logged_at: l.logged_at, meal_score: l.meal_score } }
-      }
+    // Last food per patient — RPC already returns one row per patient
+    for (const log of (rpcFoodLogs ?? [])) {
+      const l = log as { patient_id: string; last_logged_at: string; meal_score: number | null }
+      lastFoodMap = { ...lastFoodMap, [l.patient_id]: { logged_at: l.last_logged_at, meal_score: l.meal_score } }
     }
 
-    // Last weight per patient
-    for (const log of (allWeightLogs ?? [])) {
-      const l = log as { patient_id: string; logged_at: string }
-      if (!lastWeightMap[l.patient_id]) {
-        lastWeightMap = { ...lastWeightMap, [l.patient_id]: l.logged_at }
-      }
+    // Last weight per patient — RPC already returns one row per patient
+    for (const log of (rpcWeightLogs ?? [])) {
+      const l = log as { patient_id: string; last_logged_at: string }
+      lastWeightMap = { ...lastWeightMap, [l.patient_id]: l.last_logged_at }
     }
   }
 

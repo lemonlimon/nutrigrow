@@ -28,16 +28,21 @@ export function WeightChart({ points }: WeightChartProps) {
   const chartH = VH - padT - padB   // 120px of drawable height
 
   // ── Scale ─────────────────────────────────────────────────────────────────
-  const weights = points.map(p => Number(p.weight_kg))
-  const minW    = Math.min(...weights)
-  const maxW    = Math.max(...weights)
-  const range   = maxW - minW || 1   // guard against all-same values → flat line
+  const weights  = points.map(p => Number(p.weight_kg))
+  const minW     = Math.min(...weights)
+  const maxW     = Math.max(...weights)
+  // When all weights are the same, add ±6 kg padding so the line sits in the
+  // middle of the chart instead of flatlining at the bottom edge.
+  const padding  = maxW === minW ? 5 : 0
+  const chartMin = minW - padding - 1
+  const chartMax = maxW + padding + 1
+  const rangeAdj = chartMax - chartMin
 
   const toX = (i: number) =>
     padL + (i / (points.length - 1)) * chartW
 
   const toY = (w: number) =>
-    padT + chartH - ((w - minW) / range) * chartH
+    padT + chartH - ((w - chartMin) / rangeAdj) * chartH
 
   // ── SVG path for the line ─────────────────────────────────────────────────
   const linePath = points

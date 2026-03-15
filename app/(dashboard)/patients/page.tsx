@@ -1,9 +1,9 @@
 // CHANGE 1: headings → #1a1a1a, no green on body text
 // CHANGE 5: last-logged signal added per patient row
 import Link                  from 'next/link'
+import { redirect }          from 'next/navigation'
+import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-const CLINIC_ID = '00000000-0000-0000-0000-000000000001'
 
 interface Patient {
   id:          string
@@ -36,13 +36,26 @@ function fmtLastLogged(iso: string | undefined): string {
 }
 
 export default async function PatientsPage() {
+  // ── Auth + dynamic clinic ID ───────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const admin = createAdminClient()
+  const { data: clinicData } = await admin
+    .from('clinics')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .single()
+
+  const clinicId = clinicData?.id
+  if (!clinicId) redirect('/login')
 
   // ── Fetch patients ────────────────────────────────────────────────────────
   const { data: patients, error } = await admin
     .from('patients')
     .select('id, first_name, age, sex, weight_kg, enrolled_at')
-    .eq('clinic_id', CLINIC_ID)
+    .eq('clinic_id', clinicId)
     .order('enrolled_at', { ascending: false })
 
   if (error) console.error('[PatientsPage] query failed:', error)

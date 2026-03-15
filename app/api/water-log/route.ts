@@ -5,12 +5,20 @@
 
 import { NextResponse }      from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient }      from '@/lib/supabase/server'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const MAX_ML       = 2000
 
 export async function GET(request: Request) {
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user || authError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const patientId = searchParams.get('patientId')
   const date      = searchParams.get('date')
@@ -42,6 +50,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user || authError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   let body: { patientId?: string; date?: string; glasses?: number }
   try {
     body = await request.json()

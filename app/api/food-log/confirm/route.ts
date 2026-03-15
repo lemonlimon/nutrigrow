@@ -4,6 +4,7 @@
 
 import { NextResponse }      from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient }      from '@/lib/supabase/server'
 
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -31,6 +32,13 @@ interface FoodAnalysis {
 }
 
 export async function POST(request: Request) {
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user || authError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   let body: { patientId?: unknown; analysis?: unknown; mealType?: unknown }
   try {
     body = await request.json()

@@ -68,13 +68,18 @@ export function WeightChart({ points, baseline, unit = 'kg' }: WeightChartProps)
   // ── Convert to display unit ────────────────────────────────────────────────
   const dp = allPoints.map(p => ({ ...p, v: toDisplay(p.weight_kg, unit) }))
 
-  const vals  = dp.map(p => p.v)
-  const minV  = Math.min(...vals)
-  const maxV  = Math.max(...vals)
-  const range = maxV - minV || 1
+  const vals     = dp.map(p => p.v)
+  const minV     = Math.min(...vals)
+  const maxV     = Math.max(...vals)
+  // When all values are the same, add ±6 unit padding so the line sits in the
+  // middle of the chart instead of flatlining at the bottom edge.
+  const padding  = maxV === minV ? 5 : 0
+  const chartMin = minV - padding - 1
+  const chartMax = maxV + padding + 1
+  const rangeAdj = chartMax - chartMin
 
   const toX = (i: number) => PAD_L + (i / (dp.length - 1)) * CHART_W
-  const toY = (v: number) => PAD_T + CHART_H - ((v - minV) / range) * CHART_H
+  const toY = (v: number) => PAD_T + CHART_H - ((v - chartMin) / rangeAdj) * CHART_H
 
   // ── Paths ──────────────────────────────────────────────────────────────────
   const lineSegments = dp

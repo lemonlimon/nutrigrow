@@ -5,6 +5,10 @@
 import { NextResponse } from 'next/server'
 import Anthropic        from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient }      from '@/lib/supabase/server'
+import { toZonedTime, format as formatTZ } from 'date-fns-tz'
+
+const TIMEZONE = 'Asia/Riyadh'
 
 const MODEL     = 'claude-haiku-4-5-20251001'
 const MAX_TOKENS = 150
@@ -56,6 +60,13 @@ Respond with ONLY a JSON object, no markdown:
 }
 
 export async function GET(request: Request) {
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user || authError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const patientId = searchParams.get('patientId')
   const tipDate   = searchParams.get('date')   // "YYYY-MM-DD"
@@ -147,18 +158,23 @@ export async function GET(request: Request) {
     weightTrend = delta < -0.1 ? 'down' : delta > 0.1 ? 'up' : 'flat'
   }
 
-  // Streak calculation
+  // Streak calculation — dates normalised to KSA timezone (UTC+3)
+  // so a log at 1am KSA counts as "today", not yesterday (UTC)
   const allDates = [
     ...(streakWeights ?? []),
     ...(streakFoods   ?? []),
     ...(streakCtxs    ?? []),
   ].map(l => l.logged_at)
-  const dateSet  = new Set(allDates.map((d: string) => d.slice(0, 10)))
+  const dateSet = new Set(
+    allDates.map((d: string) =>
+      formatTZ(toZonedTime(new Date(d), TIMEZONE), 'yyyy-MM-dd', { timeZone: TIMEZONE })
+    )
+  )
   let streak = 0
   for (let i = 0; i < 30; i++) {
     const d   = new Date()
     d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
+    const key = formatTZ(toZonedTime(d, TIMEZONE), 'yyyy-MM-dd', { timeZone: TIMEZONE })
     if (dateSet.has(key)) { streak++ } else { break }
   }
 
